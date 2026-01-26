@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+
+  app:
+    build:
+      context: .
+      args:
+        # These are populated automatically from .env by docker-compose
+        MONGODB_URI: ${MONGODB_URI}
+        PORT: ${PORT}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # override MONGODB_URI to point to the mongo service in compose
+      - MONGODB_URI=mongodb://mongo:27017/${MONGODB_DB:-lead-management}
+      - PORT=${PORT:-3000}
+    depends_on:
+      - mongo
+    ports:
+      - "3000:3000"
+
+volumes:
+  mongo-data:
