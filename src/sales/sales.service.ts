@@ -58,7 +58,7 @@ export class SalesService {
     }
 
     // Create sale
-    return this.saleModel.create({
+    const sale = await this.saleModel.create({
       leadId: new Types.ObjectId(convertLeadDto.leadId),
       salesExecutiveId: new Types.ObjectId(salesExecutiveId),
       influencerId: lead.influencerId,
@@ -67,6 +67,15 @@ export class SalesService {
       gstCustomer: convertLeadDto.gstCustomer,
       saleDate: new Date(convertLeadDto.saleDate),
     });
+
+    // Keep Lead document in sync: mark as converted and set sales amount
+    await this.leadsService.updateConversion(
+      convertLeadDto.leadId,
+      true,
+      convertLeadDto.saleAmount,
+    );
+
+    return sale;
   }
 
   async findMySales(salesExecutiveId: string): Promise<SaleDocument[]> {

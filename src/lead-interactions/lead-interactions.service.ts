@@ -6,6 +6,7 @@ import {
   LeadInteractionDocument,
 } from './schemas/lead-interaction.schema';
 import { CreateLeadInteractionDto } from './dto/create-lead-interaction.dto';
+import { LeadsService } from '../leads/leads.service';
 import { Types } from 'mongoose';
 
 @Injectable()
@@ -13,13 +14,14 @@ export class LeadInteractionsService {
   constructor(
     @InjectModel(LeadInteraction.name)
     private leadInteractionModel: Model<LeadInteractionDocument>,
+    private leadsService: LeadsService,
   ) {}
 
   async create(
     createLeadInteractionDto: CreateLeadInteractionDto,
     salesExecutiveId: string,
   ): Promise<LeadInteractionDocument> {
-    return this.leadInteractionModel.create({
+    const interaction = await this.leadInteractionModel.create({
       ...createLeadInteractionDto,
       leadId: new Types.ObjectId(createLeadInteractionDto.leadId),
       salesExecutiveId: new Types.ObjectId(salesExecutiveId),
@@ -29,6 +31,20 @@ export class LeadInteractionsService {
         ? new Date(createLeadInteractionDto.followUpDate)
         : null,
     });
+
+    // Keep Lead document in sync with latest interaction snapshot
+    await this.leadsService.updateSnapshot(createLeadInteractionDto.leadId, {
+      callStatus: createLeadInteractionDto.callStatus,
+      rating: createLeadInteractionDto.rating,
+      notes: createLeadInteractionDto.notes,
+      followUpDate: createLeadInteractionDto.followUpDate
+        ? new Date(createLeadInteractionDto.followUpDate)
+        : undefined,
+      converted: createLeadInteractionDto.converted ?? false,
+      gstCustomer: createLeadInteractionDto.gstCustomer ?? false,
+    });
+
+    return interaction;
   }
 
   async findOne(id: string): Promise<LeadInteractionDocument | null> {

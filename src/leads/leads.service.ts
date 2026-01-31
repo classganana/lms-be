@@ -43,5 +43,50 @@ export class LeadsService {
   async findAll(): Promise<LeadDocument[]> {
     return this.leadModel.find().exec();
   }
+
+  /**
+   * Update lead with latest interaction snapshot (callStatus, rating, notes, followUpDate, converted, gstCustomer).
+   * Keeps Lead document in sync when a LeadInteraction is created.
+   */
+  async updateSnapshot(
+    leadId: string,
+    snapshot: {
+      callStatus?: 'CONNECTED' | 'NOT_CONNECTED' | 'WRONG';
+      rating?: number;
+      notes?: string;
+      followUpDate?: Date | null;
+      converted?: boolean;
+      gstCustomer?: boolean;
+    },
+  ): Promise<LeadDocument | null> {
+    // Only set defined values so we don't overwrite with undefined
+    const toSet: Record<string, unknown> = {};
+    if (snapshot.callStatus !== undefined) toSet.callStatus = snapshot.callStatus;
+    if (snapshot.rating !== undefined) toSet.rating = snapshot.rating;
+    if (snapshot.notes !== undefined) toSet.notes = snapshot.notes;
+    if (snapshot.followUpDate !== undefined) toSet.followUpDate = snapshot.followUpDate;
+    if (snapshot.converted !== undefined) toSet.converted = snapshot.converted;
+    if (snapshot.gstCustomer !== undefined) toSet.gstCustomer = snapshot.gstCustomer;
+    return this.leadModel
+      .findByIdAndUpdate(leadId, { $set: toSet }, { new: true })
+      .exec();
+  }
+
+  /**
+   * Update lead when converted to sale (converted = true, salesAmount set).
+   */
+  async updateConversion(
+    leadId: string,
+    converted: boolean,
+    salesAmount: number | null,
+  ): Promise<LeadDocument | null> {
+    return this.leadModel
+      .findByIdAndUpdate(
+        leadId,
+        { $set: { converted, salesAmount } },
+        { new: true },
+      )
+      .exec();
+  }
 }
 

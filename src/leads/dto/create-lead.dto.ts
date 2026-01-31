@@ -5,6 +5,12 @@ import {
   IsMobilePhone,
   IsOptional,
   IsEmail,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsDateString,
+  Min,
+  Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -53,5 +59,42 @@ export class CreateLeadDto {
   @IsString()
   @IsNotEmpty()
   sourceCode: string;
+
+  @ApiPropertyOptional({ example: 'CONNECTED', enum: ['CONNECTED', 'NOT_CONNECTED', 'WRONG'], description: 'Latest call status' })
+  @IsEnum(['CONNECTED', 'NOT_CONNECTED', 'WRONG'])
+  @IsOptional()
+  callStatus?: 'CONNECTED' | 'NOT_CONNECTED' | 'WRONG';
+
+  @ApiPropertyOptional({ example: 4, description: 'Rating from 1 to 5', minimum: 1, maximum: 5 })
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  @IsOptional()
+  rating?: number;
+
+  @ApiPropertyOptional({ example: 'Left a voicemail', description: 'Notes about the lead' })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @ApiPropertyOptional({ example: '2026-02-01T10:00:00Z', description: 'Follow-up date (ISO string)' })
+  @IsDateString()
+  @IsOptional()
+  followUpDate?: string;
+
+  @ApiPropertyOptional({ example: false, description: 'Whether lead has been converted to sale' })
+  @IsBoolean()
+  @IsOptional()
+  converted?: boolean;
+
+  @ApiPropertyOptional({ example: false, description: 'Whether lead is GST customer' })
+  @IsBoolean()
+  @IsOptional()
+  gstCustomer?: boolean;
+
+  @ApiPropertyOptional({ example: null, description: 'Sales amount (null if not converted)' })
+  @IsNumber()
+  @IsOptional()
+  salesAmount?: number | null;
 }
 
