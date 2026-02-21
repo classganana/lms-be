@@ -1,11 +1,21 @@
-import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Lead, LeadDocument } from '../leads/schemas/lead.schema';
-import { LeadInteraction, LeadInteractionDocument } from '../lead-interactions/schemas/lead-interaction.schema';
-import { Sale, SaleDocument } from '../sales/schemas/sale.schema';
-import { User, UserDocument } from '../users/schemas/user.schema';
-import { Types } from 'mongoose';
+import { Injectable } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import { Lead, LeadDocument } from "../leads/schemas/lead.schema";
+import {
+  LeadInteraction,
+  LeadInteractionDocument,
+} from "../lead-interactions/schemas/lead-interaction.schema";
+import { Sale, SaleDocument } from "../sales/schemas/sale.schema";
+import { User, UserDocument } from "../users/schemas/user.schema";
+import { Types } from "mongoose";
+
+/** Count sale as GST customer: gstStatus YES/APPLIED or legacy gstCustomer true */
+function isGstCustomer(sale: SaleDocument): boolean {
+  if (sale.gstStatus === "YES" || sale.gstStatus === "APPLIED") return true;
+  if ((sale as any).gstCustomer === true) return true; // backward compat
+  return false;
+}
 
 @Injectable()
 export class DashboardService {
@@ -42,25 +52,25 @@ export class DashboardService {
 
     // Interested (rating >= 3 and not wrong number)
     const interested = interactions.filter(
-      (i) => i.rating >= 3 && i.callStatus !== 'WRONG',
+      (i) => i.rating >= 3 && i.callStatus !== "WRONG",
     ).length;
 
     // Non-Interested (rating <= 2 and not wrong number)
     const nonInterested = interactions.filter(
-      (i) => i.rating <= 2 && i.callStatus !== 'WRONG',
+      (i) => i.rating <= 2 && i.callStatus !== "WRONG",
     ).length;
 
     // Wrong Numbers
     const wrongNumbers = interactions.filter(
-      (i) => i.callStatus === 'WRONG',
+      (i) => i.callStatus === "WRONG",
     ).length;
 
     // Pending Leads (leads without any interactions)
     const leadIdsWithInteractions = new Set(
       interactions.map((i) => i.leadId.toString()),
     );
-    const allLeadIds = (await this.leadModel.find(dateMatch).exec()).map(
-      (l) => l._id.toString(),
+    const allLeadIds = (await this.leadModel.find(dateMatch).exec()).map((l) =>
+      l._id.toString(),
     );
     const pendingLeads = allLeadIds.filter(
       (id) => !leadIdsWithInteractions.has(id),
@@ -77,7 +87,7 @@ export class DashboardService {
     const sales = await this.saleModel.find(saleMatch).exec();
     const totalSales = sales.length;
     const totalRevenue = sales.reduce((sum, sale) => sum + sale.saleAmount, 0);
-    const gstCustomers = sales.filter((s) => s.gstCustomer).length;
+    const gstCustomers = sales.filter((s) => isGstCustomer(s)).length;
     const gstCustomersPercentage =
       totalSales > 0 ? (gstCustomers / totalSales) * 100 : 0;
 
@@ -156,15 +166,17 @@ export class DashboardService {
     // Calculate conversion percentages and get user names
     const executives = await Promise.all(
       Array.from(execMap.values()).map(async (exec) => {
-        const user = await this.userModel.findById(exec.salesExecutiveId).exec();
+        const user = await this.userModel
+          .findById(exec.salesExecutiveId)
+          .exec();
         exec.conversionPercentage =
           exec.totalLeads > 0
             ? parseFloat(((exec.sales / exec.totalLeads) * 100).toFixed(2))
             : 0;
         return {
           ...exec,
-          name: user?.name || 'Unknown',
-          email: user?.email || '',
+          name: user?.name || "Unknown",
+          email: user?.email || "",
         };
       }),
     );
@@ -185,32 +197,32 @@ export class DashboardService {
       {
         $group: {
           _id: {
-            influencerId: '$influencerId',
-            sourceCode: '$sourceCode',
+            influencerId: "$influencerId",
+            sourceCode: "$sourceCode",
           },
           totalSales: { $sum: 1 },
-          totalRevenue: { $sum: '$saleAmount' },
+          totalRevenue: { $sum: "$saleAmount" },
         },
       },
       {
         $lookup: {
-          from: 'influencers',
-          localField: '_id.influencerId',
-          foreignField: '_id',
-          as: 'influencer',
+          from: "influencers",
+          localField: "_id.influencerId",
+          foreignField: "_id",
+          as: "influencer",
         },
       },
       {
         $unwind: {
-          path: '$influencer',
+          path: "$influencer",
           preserveNullAndEmptyArrays: true,
         },
       },
       {
         $project: {
-          influencerId: '$_id.influencerId',
-          influencerName: '$influencer.name',
-          sourceCode: '$_id.sourceCode',
+          influencerId: "$_id.influencerId",
+          influencerName: "$influencer.name",
+          sourceCode: "$_id.sourceCode",
           totalSales: 1,
           totalRevenue: 1,
         },
@@ -225,8 +237,12 @@ export class DashboardService {
     startDate?: Date,
     endDate?: Date,
   ) {
-    const interactionMatch: any = { salesExecutiveId: new Types.ObjectId(salesExecutiveId) };
-    const saleDateMatch: any = { salesExecutiveId: new Types.ObjectId(salesExecutiveId) };
+    const interactionMatch: any = {
+      salesExecutiveId: new Types.ObjectId(salesExecutiveId),
+    };
+    const saleDateMatch: any = {
+      salesExecutiveId: new Types.ObjectId(salesExecutiveId),
+    };
 
     if (startDate || endDate) {
       interactionMatch.createdAt = {};
@@ -247,20 +263,20 @@ export class DashboardService {
       .exec();
 
     // Get unique lead IDs from interactions
-    const leadIds = [...new Set(interactions.map((i) => i.leadId.toString()))].map(
-      (id) => new Types.ObjectId(id),
-    );
+    const leadIds = [
+      ...new Set(interactions.map((i) => i.leadId.toString())),
+    ].map((id) => new Types.ObjectId(id));
 
     // Calculate metrics - unique leads this executive has interacted with
     const totalLeads = leadIds.length;
     const interested = interactions.filter(
-      (i) => i.rating >= 3 && i.callStatus !== 'WRONG',
+      (i) => i.rating >= 3 && i.callStatus !== "WRONG",
     ).length;
     const nonInterested = interactions.filter(
-      (i) => i.rating <= 2 && i.callStatus !== 'WRONG',
+      (i) => i.rating <= 2 && i.callStatus !== "WRONG",
     ).length;
     const wrongNumbers = interactions.filter(
-      (i) => i.callStatus === 'WRONG',
+      (i) => i.callStatus === "WRONG",
     ).length;
 
     // For pending leads, we need to check leads created by this executive that don't have interactions
@@ -273,7 +289,7 @@ export class DashboardService {
     const leadIdsWithInteractions = new Set(
       interactions.map((i) => i.leadId.toString()),
     );
-    
+
     // Pending leads: leads created by this executive that have no interactions
     const allInteractionsForCreatedLeads = await this.leadInteractionModel
       .find({ leadId: { $in: leadsCreatedByExecutive.map((l) => l._id) } })
@@ -289,7 +305,7 @@ export class DashboardService {
     const sales = await this.saleModel.find(saleDateMatch).exec();
     const totalSales = sales.length;
     const totalRevenue = sales.reduce((sum, sale) => sum + sale.saleAmount, 0);
-    const gstCustomers = sales.filter((s) => s.gstCustomer).length;
+    const gstCustomers = sales.filter((s) => isGstCustomer(s)).length;
     const gstCustomersPercentage =
       totalSales > 0 ? (gstCustomers / totalSales) * 100 : 0;
 
@@ -318,4 +334,3 @@ export class DashboardService {
     };
   }
 }
-

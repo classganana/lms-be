@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { LeadsService } from './leads.service';
-import { LeadsController } from './leads.controller';
-import { Lead, LeadSchema } from './schemas/lead.schema';
+import { Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { LeadsService } from "./leads.service";
+import { LeadsController } from "./leads.controller";
+import { Lead, LeadSchema } from "./schemas/lead.schema";
 
 @Module({
   imports: [
@@ -13,4 +13,3 @@ import { Lead, LeadSchema } from './schemas/lead.schema';
   exports: [LeadsService],
 })
 export class LeadsModule {}
-

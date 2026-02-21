@@ -1,5 +1,5 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type UserDocument = User & Document;
 
@@ -17,8 +17,8 @@ export class User {
   @Prop({ required: true })
   password: string;
 
-  @Prop({ required: true, enum: ['ADMIN', 'NON_ADMIN'] })
-  role: 'ADMIN' | 'NON_ADMIN';
+  @Prop({ required: true, enum: ["ADMIN", "NON_ADMIN"] })
+  role: "ADMIN" | "NON_ADMIN";
 
   @Prop({ default: true })
   isActive: boolean;
@@ -28,4 +28,3 @@ export class User {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
-

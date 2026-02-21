@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject } from "@nestjs/common";
 import {
   AggregateOptions,
   AnyBulkWriteOperation,
@@ -12,8 +12,8 @@ import {
   InsertOneOptions,
   UpdateFilter,
   UpdateOptions,
-} from 'mongodb';
-import { Constants } from '../constants';
+} from "mongodb";
+import { Constants } from "../constants";
 
 @Injectable()
 export class MongoRepository {

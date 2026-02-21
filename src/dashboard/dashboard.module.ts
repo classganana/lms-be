@@ -1,17 +1,17 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { DashboardService } from './dashboard.service';
+import { Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { DashboardService } from "./dashboard.service";
 import {
   AdminDashboardController,
   SalesDashboardController,
-} from './dashboard.controller';
-import { Lead, LeadSchema } from '../leads/schemas/lead.schema';
+} from "./dashboard.controller";
+import { Lead, LeadSchema } from "../leads/schemas/lead.schema";
 import {
   LeadInteraction,
   LeadInteractionSchema,
-} from '../lead-interactions/schemas/lead-interaction.schema';
-import { Sale, SaleSchema } from '../sales/schemas/sale.schema';
-import { User, UserSchema } from '../users/schemas/user.schema';
+} from "../lead-interactions/schemas/lead-interaction.schema";
+import { Sale, SaleSchema } from "../sales/schemas/sale.schema";
+import { User, UserSchema } from "../users/schemas/user.schema";
 
 @Module({
   imports: [
@@ -26,4 +26,3 @@ import { User, UserSchema } from '../users/schemas/user.schema';
   providers: [DashboardService],
 })
 export class DashboardModule {}
-

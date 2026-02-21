@@ -1,5 +1,5 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 export type SourceCodeDocument = SourceCode & Document;
 
@@ -8,8 +8,8 @@ export class SourceCode {
   @Prop({ required: true })
   code: string;
 
-  @Prop({ required: true, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' })
-  status: 'ACTIVE' | 'INACTIVE';
+  @Prop({ required: true, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE" })
+  status: "ACTIVE" | "INACTIVE";
 
   @Prop({ required: true, default: Date.now })
   activatedAt: Date;
@@ -38,4 +38,3 @@ export class Influencer {
 }
 
 export const InfluencerSchema = SchemaFactory.createForClass(Influencer);
-

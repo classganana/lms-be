@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { SalesService } from './sales.service';
-import { SalesController } from './sales.controller';
-import { Sale, SaleSchema } from './schemas/sale.schema';
-import { LeadsModule } from '../leads/leads.module';
-import { LeadInteractionsModule } from '../lead-interactions/lead-interactions.module';
+import { Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { SalesService } from "./sales.service";
+import { SalesController } from "./sales.controller";
+import { Sale, SaleSchema } from "./schemas/sale.schema";
+import { LeadsModule } from "../leads/leads.module";
+import { LeadInteractionsModule } from "../lead-interactions/lead-interactions.module";
 
 @Module({
   imports: [
@@ -17,4 +17,3 @@ import { LeadInteractionsModule } from '../lead-interactions/lead-interactions.m
   exports: [SalesService],
 })
 export class SalesModule {}
-

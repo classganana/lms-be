@@ -1,8 +1,11 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { InfluencersService } from './influencers.service';
-import { AdminInfluencersController, SalesInfluencersController } from './influencers.controller';
-import { Influencer, InfluencerSchema } from './schemas/influencer.schema';
+import { Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { InfluencersService } from "./influencers.service";
+import {
+  AdminInfluencersController,
+  SalesInfluencersController,
+} from "./influencers.controller";
+import { Influencer, InfluencerSchema } from "./schemas/influencer.schema";
 
 @Module({
   imports: [
@@ -15,4 +18,3 @@ import { Influencer, InfluencerSchema } from './schemas/influencer.schema';
   exports: [InfluencersService],
 })
 export class InfluencersModule {}
-

@@ -3,10 +3,13 @@ import {
   Injectable,
   ArgumentMetadata,
   BadRequestException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
 @Injectable()
-export class ParseOptionalDatePipe implements PipeTransform<string, Date | undefined> {
+export class ParseOptionalDatePipe implements PipeTransform<
+  string,
+  Date | undefined
+> {
   transform(value: string, metadata: ArgumentMetadata): Date | undefined {
     if (!value) {
       return undefined;
@@ -22,4 +25,3 @@ export class ParseOptionalDatePipe implements PipeTransform<string, Date | undef
     return date;
   }
 }
-

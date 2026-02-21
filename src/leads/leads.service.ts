@@ -1,15 +1,34 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Lead, LeadDocument } from './schemas/lead.schema';
-import { CreateLeadDto } from './dto/create-lead.dto';
-import { Types } from 'mongoose';
+import { Injectable } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import { Lead, LeadDocument } from "./schemas/lead.schema";
+import { CreateLeadDto } from "./dto/create-lead.dto";
+import { Types } from "mongoose";
+import { buildFilter } from "../common/utils/build-filter";
+
+/** Allowlist of filterable keys for leads (generic filter). Add a key here to allow filtering by that field. */
+export const LEAD_FILTER_ALLOWLIST: Record<
+  string,
+  "string" | "objectId" | "boolean" | "number" | "stringExact"
+> = {
+  name: "string",
+  mobile: "string",
+  state: "string",
+  city: "string",
+  address: "string",
+  pincode: "string",
+  email: "string",
+  influencerId: "objectId",
+  sourceCode: "string",
+  callStatus: "stringExact",
+  converted: "boolean",
+  gstStatus: "stringExact",
+  rating: "number",
+};
 
 @Injectable()
 export class LeadsService {
-  constructor(
-    @InjectModel(Lead.name) private leadModel: Model<LeadDocument>,
-  ) {}
+  constructor(@InjectModel(Lead.name) private leadModel: Model<LeadDocument>) {}
 
   async createOrFind(
     createLeadDto: CreateLeadDto,
@@ -24,12 +43,21 @@ export class LeadsService {
       return existingLead;
     }
 
-    // Create new lead
-    return this.leadModel.create({
-      ...createLeadDto,
-      influencerId: new Types.ObjectId(createLeadDto.influencerId),
+    // Create new lead (only mobile is required; other fields optional)
+    const payload: Record<string, unknown> = {
+      mobile: createLeadDto.mobile,
       createdBy: new Types.ObjectId(createdBy),
-    });
+    };
+    if (createLeadDto.influencerId) {
+      payload.influencerId = new Types.ObjectId(createLeadDto.influencerId);
+    }
+    ["name", "state", "city", "address", "pincode", "email", "sourceCode", "callStatus", "rating", "notes", "followUpDate", "converted", "gstStatus", "salesAmount"].forEach(
+      (key) => {
+        const v = (createLeadDto as any)[key];
+        if (v !== undefined && v !== null) payload[key] = v;
+      },
+    );
+    return this.leadModel.create(payload);
   }
 
   async findByMobile(mobile: string): Promise<LeadDocument | null> {
@@ -40,33 +68,52 @@ export class LeadsService {
     return this.leadModel.findById(id).exec();
   }
 
-  async findAll(): Promise<LeadDocument[]> {
-    return this.leadModel.find().exec();
+  async findAll(opts?: {
+    skip?: number;
+    limit?: number;
+    sort?: Record<string, 1 | -1>;
+    /** Generic filter: only keys in LEAD_FILTER_ALLOWLIST are applied. */
+    filter?: Record<string, string>;
+  }): Promise<LeadDocument[]> {
+    const mongoFilter =
+      opts?.filter && Object.keys(opts.filter).length
+        ? buildFilter(opts.filter, LEAD_FILTER_ALLOWLIST)
+        : {};
+    let q = this.leadModel.find(mongoFilter);
+    if (opts?.sort && Object.keys(opts.sort).length) {
+      q = q.sort(opts.sort);
+    } else {
+      q = q.sort({ createdAt: -1 });
+    }
+    if (opts?.skip != null) q = q.skip(opts.skip);
+    if (opts?.limit != null && opts.limit > 0) q = q.limit(opts.limit);
+    return q.exec();
   }
 
   /**
-   * Update lead with latest interaction snapshot (callStatus, rating, notes, followUpDate, converted, gstCustomer).
+   * Update lead with latest interaction snapshot (callStatus, rating, notes, followUpDate, converted, gstStatus).
    * Keeps Lead document in sync when a LeadInteraction is created.
    */
   async updateSnapshot(
     leadId: string,
     snapshot: {
-      callStatus?: 'CONNECTED' | 'NOT_CONNECTED' | 'WRONG';
+      callStatus?: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
       rating?: number;
       notes?: string;
       followUpDate?: Date | null;
       converted?: boolean;
-      gstCustomer?: boolean;
+      gstStatus?: "APPLIED" | "YES" | "NO";
     },
   ): Promise<LeadDocument | null> {
-    // Only set defined values so we don't overwrite with undefined
     const toSet: Record<string, unknown> = {};
-    if (snapshot.callStatus !== undefined) toSet.callStatus = snapshot.callStatus;
+    if (snapshot.callStatus !== undefined)
+      toSet.callStatus = snapshot.callStatus;
     if (snapshot.rating !== undefined) toSet.rating = snapshot.rating;
     if (snapshot.notes !== undefined) toSet.notes = snapshot.notes;
-    if (snapshot.followUpDate !== undefined) toSet.followUpDate = snapshot.followUpDate;
+    if (snapshot.followUpDate !== undefined)
+      toSet.followUpDate = snapshot.followUpDate;
     if (snapshot.converted !== undefined) toSet.converted = snapshot.converted;
-    if (snapshot.gstCustomer !== undefined) toSet.gstCustomer = snapshot.gstCustomer;
+    if (snapshot.gstStatus !== undefined) toSet.gstStatus = snapshot.gstStatus;
     return this.leadModel
       .findByIdAndUpdate(leadId, { $set: toSet }, { new: true })
       .exec();
@@ -89,4 +136,3 @@ export class LeadsService {
       .exec();
   }
 }
-

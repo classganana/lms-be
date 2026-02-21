@@ -1,17 +1,17 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document, Types } from "mongoose";
 
 export type SaleDocument = Sale & Document;
 
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class Sale {
-  @Prop({ type: Types.ObjectId, ref: 'Lead', required: true, unique: true })
+  @Prop({ type: Types.ObjectId, ref: "Lead", required: true, unique: true })
   leadId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: Types.ObjectId, ref: "User", required: true })
   salesExecutiveId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Influencer', required: true })
+  @Prop({ type: Types.ObjectId, ref: "Influencer", required: true })
   influencerId: Types.ObjectId;
 
   @Prop({ required: true })
@@ -20,8 +20,11 @@ export class Sale {
   @Prop({ required: true })
   saleAmount: number;
 
-  @Prop({ required: true })
-  gstCustomer: boolean;
+  @Prop({ required: false, enum: ["APPLIED", "YES", "NO"] })
+  gstStatus?: "APPLIED" | "YES" | "NO";
+
+  @Prop({ required: false })
+  gstCustomer?: boolean; // deprecated, use gstStatus
 
   @Prop({ required: true, default: Date.now })
   saleDate: Date;
@@ -30,4 +33,3 @@ export class Sale {
 }
 
 export const SaleSchema = SchemaFactory.createForClass(Sale);
-
