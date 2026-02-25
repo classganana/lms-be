@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
   Query,
   Param,
@@ -19,6 +21,7 @@ import {
 } from "@nestjs/swagger";
 import { LeadsService, LEAD_FILTER_ALLOWLIST } from "./leads.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
+import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { LeadResponseDto } from "./dto/lead-response.dto";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
@@ -252,5 +255,57 @@ export class LeadsController {
   })
   async create(@Body() createLeadDto: CreateLeadDto, @CurrentUser() user: any) {
     return this.leadsService.createOrFind(createLeadDto, user.id);
+  }
+
+  @Patch(":id")
+  @ApiOperation({
+    summary: "Update a lead by ID",
+    description:
+      "Updates a lead. Only the fields provided in the body will be updated; others remain unchanged.",
+  })
+  @ApiParam({
+    name: "id",
+    description: "Lead ID (MongoDB ObjectId)",
+    example: "60d0fe4f5311236168a109ca",
+  })
+  @ApiBody({ type: UpdateLeadDto })
+  @ApiResponse({
+    status: 200,
+    description: "Lead updated successfully",
+    type: LeadResponseDto,
+  })
+  @ApiResponse({ status: 404, description: "Lead not found" })
+  @ApiResponse({
+    status: 400,
+    description: "Bad request - validation error",
+  })
+  async update(
+    @Param("id", ParseMongoIdPipe) id: string,
+    @Body() updateLeadDto: UpdateLeadDto,
+  ) {
+    const lead = await this.leadsService.update(id, updateLeadDto);
+    if (!lead) {
+      throw new NotFoundException("Lead not found");
+    }
+    return lead;
+  }
+
+  @Delete(":id")
+  @ApiOperation({
+    summary: "Delete a lead by ID",
+  })
+  @ApiParam({
+    name: "id",
+    description: "Lead ID (MongoDB ObjectId)",
+    example: "60d0fe4f5311236168a109ca",
+  })
+  @ApiResponse({ status: 200, description: "Lead deleted successfully" })
+  @ApiResponse({ status: 404, description: "Lead not found" })
+  async remove(@Param("id", ParseMongoIdPipe) id: string) {
+    const lead = await this.leadsService.remove(id);
+    if (!lead) {
+      throw new NotFoundException("Lead not found");
+    }
+    return { success: true };
   }
 }

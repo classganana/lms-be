@@ -3,6 +3,7 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { Lead, LeadDocument } from "./schemas/lead.schema";
 import { CreateLeadDto } from "./dto/create-lead.dto";
+import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { Types } from "mongoose";
 import { buildFilter } from "../common/utils/build-filter";
 
@@ -58,6 +59,61 @@ export class LeadsService {
       },
     );
     return this.leadModel.create(payload);
+  }
+
+  async update(
+    id: string,
+    updateLeadDto: UpdateLeadDto,
+  ): Promise<LeadDocument | null> {
+    const update: Record<string, unknown> = {};
+    const {
+      influencerId,
+      name,
+      state,
+      city,
+      address,
+      pincode,
+      email,
+      sourceCode,
+      callStatus,
+      rating,
+      notes,
+      followUpDate,
+      converted,
+      gstStatus,
+      salesAmount,
+      mobile,
+    } = updateLeadDto;
+
+    if (mobile !== undefined) update.mobile = mobile;
+    if (influencerId) update.influencerId = new Types.ObjectId(influencerId);
+    if (name !== undefined) update.name = name;
+    if (state !== undefined) update.state = state;
+    if (city !== undefined) update.city = city;
+    if (address !== undefined) update.address = address;
+    if (pincode !== undefined) update.pincode = pincode;
+    if (email !== undefined) update.email = email;
+    if (sourceCode !== undefined) update.sourceCode = sourceCode;
+    if (callStatus !== undefined) update.callStatus = callStatus;
+    if (rating !== undefined) update.rating = rating;
+    if (notes !== undefined) update.notes = notes;
+    if (followUpDate !== undefined)
+      update.followUpDate = followUpDate ? new Date(followUpDate) : null;
+    if (converted !== undefined) update.converted = converted;
+    if (gstStatus !== undefined) update.gstStatus = gstStatus;
+    if (salesAmount !== undefined) update.salesAmount = salesAmount;
+
+    if (!Object.keys(update).length) {
+      return this.leadModel.findById(id).exec();
+    }
+
+    return this.leadModel
+      .findByIdAndUpdate(id, { $set: update }, { new: true })
+      .exec();
+  }
+
+  async remove(id: string): Promise<LeadDocument | null> {
+    return this.leadModel.findByIdAndDelete(id).exec();
   }
 
   async findByMobile(mobile: string): Promise<LeadDocument | null> {
