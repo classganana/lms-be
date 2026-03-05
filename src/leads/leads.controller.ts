@@ -151,6 +151,12 @@ export class LeadsController {
     required: false,
     description: "Filter: rating 1–5 (exact number)",
   })
+  @ApiQuery({
+    name: "salesExecutiveId",
+    required: false,
+    description:
+      "Filter: sales executive who owns the lead (maps to createdBy ObjectId)",
+  })
   @ApiResponse({
     status: 200,
     description: "List of all leads",
@@ -173,7 +179,14 @@ export class LeadsController {
       query.page && limitNum
         ? (Math.max(1, parseInt(query.page, 10) || 1) - 1) * limitNum
         : undefined;
-    const filter = getFilterQuery(query, LEAD_FILTER_ALLOWLIST);
+    // Map salesExecutiveId -> createdBy so we can reuse generic filtering
+    const queryWithOwner = {
+      ...query,
+      ...(query.salesExecutiveId
+        ? { createdBy: query.salesExecutiveId }
+        : {}),
+    };
+    const filter = getFilterQuery(queryWithOwner, LEAD_FILTER_ALLOWLIST);
     const opts = {
       sort,
       ...(limitNum !== undefined || skip !== undefined

@@ -17,6 +17,8 @@ import {
   SalesExecutivePerformanceDto,
   InfluencerWiseSalesDto,
   SalesSummaryResponseDto,
+  EmployeeSalesResponseDto,
+  UserDailyActivityResponseDto,
 } from "./dto/dashboard-response.dto";
 
 @Controller("admin/dashboard")
@@ -127,6 +129,61 @@ export class AdminDashboardController {
     @Query("endDate", new ParseOptionalDatePipe()) endDate?: Date,
   ) {
     return this.dashboardService.getInfluencerWiseSales(startDate, endDate);
+  }
+
+  @Get("employee-sales")
+  @ApiOperation({
+    summary: "Get employee-wise sales totals for the current month",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Employee-wise sales for the current month",
+    type: EmployeeSalesResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid or missing JWT token",
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Admin role required" })
+  async getEmployeeSalesCurrentMonth() {
+    return this.dashboardService.getEmployeeSalesCurrentMonth();
+  }
+
+  @Get("user-activity")
+  @ApiOperation({
+    summary:
+      "Get daily lead activity (created & updated leads) for a specific user",
+  })
+  @ApiQuery({
+    name: "userId",
+    required: true,
+    description: "Sales executive (non-admin) user ID",
+    example: "60d0fe4f5311236168a109cb",
+  })
+  @ApiQuery({
+    name: "date",
+    required: false,
+    type: String,
+    description:
+      "Date for which to compute activity (ISO 8601). Defaults to today if omitted.",
+    example: "2026-03-05T00:00:00.000Z",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Daily lead activity (created & touched leads) for the specified user",
+    type: UserDailyActivityResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid or missing JWT token",
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Admin role required" })
+  async getUserDailyActivity(
+    @Query("userId") userId: string,
+    @Query("date", new ParseOptionalDatePipe()) date?: Date,
+  ) {
+    return this.dashboardService.getUserDailyActivity(userId, date);
   }
 }
 

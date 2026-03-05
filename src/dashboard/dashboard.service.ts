@@ -50,9 +50,19 @@ export class DashboardService {
       .find(interactionMatch)
       .exec();
 
-    // Interested (rating >= 3 and not wrong number)
+    // Build a set of converted lead IDs so converted leads are excluded
+    const convertedLeadIds = new Set(
+      interactions
+        .filter((i) => i.converted)
+        .map((i) => i.leadId.toString()),
+    );
+
+    // Interested (rating >= 3, not wrong number, and not converted)
     const interested = interactions.filter(
-      (i) => i.rating >= 3 && i.callStatus !== "WRONG",
+      (i) =>
+        i.rating >= 3 &&
+        i.callStatus !== "WRONG" &&
+        !convertedLeadIds.has(i.leadId.toString()),
     ).length;
 
     // Non-Interested (rating <= 2 and not wrong number)
@@ -232,6 +242,157 @@ export class DashboardService {
     return sales;
   }
 
+  async getEmployeeSalesCurrentMonth() {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // Use Lead documents as the source of truth:
+    // sum salesAmount for converted leads created this month, grouped by createdBy.
+    const results = await this.leadModel
+      .aggregate([
+        {
+          $match: {
+            converted: true,
+            salesAmount: { $gt: 0 },
+            createdAt: {
+              $gte: startOfMonth,
+              $lt: startOfNextMonth,
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$createdBy",
+            totalSalesAmount: { $sum: "$salesAmount" },
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        {
+          $unwind: {
+            path: "$user",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            name: "$user.name",
+            sales: "$totalSalesAmount",
+          },
+        },
+        {
+          $sort: {
+            sales: -1,
+          },
+        },
+      ])
+      .exec();
+
+    return {
+      month: "current",
+      employees: results.map((row: any) => ({
+        name: row.name || "Unknown",
+        sales: row.sales || 0,
+      })),
+    };
+  }
+
+  async getUserDailyActivity(salesExecutiveId: string, date?: Date) {
+    // Normalize to given date's start/end (or today if not provided)
+    const target = date ? new Date(date) : new Date();
+    const startOfDay = new Date(
+      target.getFullYear(),
+      target.getMonth(),
+      target.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+    const endOfDay = new Date(
+      target.getFullYear(),
+      target.getMonth(),
+      target.getDate() + 1,
+      0,
+      0,
+      0,
+      0,
+    );
+
+    const execObjectId = new Types.ObjectId(salesExecutiveId);
+
+    // Leads created today by this user
+    const createdLeads = await this.leadModel
+      .find({
+        createdBy: execObjectId,
+        createdAt: { $gte: startOfDay, $lt: endOfDay },
+      })
+      .exec();
+
+    // Interactions created today by this user
+    const interactionsToday = await this.leadInteractionModel
+      .find({
+        salesExecutiveId: execObjectId,
+        createdAt: { $gte: startOfDay, $lt: endOfDay },
+      })
+      .exec();
+
+    const interactedLeadIdStrings = Array.from(
+      new Set(interactionsToday.map((i) => i.leadId.toString())),
+    );
+
+    const interactedLeads =
+      interactedLeadIdStrings.length > 0
+        ? await this.leadModel
+            .find({
+              _id: {
+                $in: interactedLeadIdStrings.map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            })
+            .exec()
+        : [];
+
+    const createdLeadIds = createdLeads.map((l) => l._id.toString());
+    const interactedLeadIds = interactedLeadIdStrings;
+
+    // Merge unique leads
+    const leadMap = new Map<string, LeadDocument>();
+    createdLeads.forEach((l) => leadMap.set(l._id.toString(), l));
+    interactedLeads.forEach((l) => leadMap.set(l._id.toString(), l));
+
+    const user = await this.userModel.findById(execObjectId).exec();
+
+    return {
+      date: startOfDay.toISOString().slice(0, 10),
+      userId: salesExecutiveId,
+      userName: user?.name || "Unknown",
+      createdCount: createdLeadIds.length,
+      touchedCount: interactedLeadIds.length,
+      leads: Array.from(leadMap.values()).map((l) => ({
+        id: l._id.toString(),
+        name: l.name || "",
+        mobile: l.mobile,
+        state: l.state || "",
+        city: l.city || "",
+        converted: l.converted,
+        createdAt: l.createdAt,
+        updatedAt: l.updatedAt,
+      })),
+      createdLeadIds,
+      interactedLeadIds,
+    };
+  }
+
   async getNonAdminSummary(
     salesExecutiveId: string,
     startDate?: Date,
@@ -262,6 +423,13 @@ export class DashboardService {
       .find(interactionMatch)
       .exec();
 
+    // Build a set of converted lead IDs so converted leads are excluded
+    const convertedLeadIds = new Set(
+      interactions
+        .filter((i) => i.converted)
+        .map((i) => i.leadId.toString()),
+    );
+
     // Get unique lead IDs from interactions
     const leadIds = [
       ...new Set(interactions.map((i) => i.leadId.toString())),
@@ -270,7 +438,10 @@ export class DashboardService {
     // Calculate metrics - unique leads this executive has interacted with
     const totalLeads = leadIds.length;
     const interested = interactions.filter(
-      (i) => i.rating >= 3 && i.callStatus !== "WRONG",
+      (i) =>
+        i.rating >= 3 &&
+        i.callStatus !== "WRONG" &&
+        !convertedLeadIds.has(i.leadId.toString()),
     ).length;
     const nonInterested = interactions.filter(
       (i) => i.rating <= 2 && i.callStatus !== "WRONG",

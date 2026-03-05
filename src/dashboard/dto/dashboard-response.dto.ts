@@ -85,6 +85,133 @@ export class InfluencerWiseSalesDto {
   totalRevenue: number;
 }
 
+export class EmployeeSalesItemDto {
+  @ApiProperty({ example: "Employee A", description: "Employee name" })
+  name: string;
+
+  @ApiProperty({
+    example: 50000,
+    description: "Total sales amount for the current month",
+  })
+  sales: number;
+}
+
+export class EmployeeSalesResponseDto {
+  @ApiProperty({
+    example: "current",
+    description: "Indicates the month for which sales are calculated",
+  })
+  month: string;
+
+  @ApiProperty({
+    type: [EmployeeSalesItemDto],
+    description: "List of employees with their current month sales totals",
+  })
+  employees: EmployeeSalesItemDto[];
+}
+
+export class UserActivityLeadDto {
+  @ApiProperty({
+    example: "60d0fe4f5311236168a109ca",
+    description: "Lead ID",
+  })
+  id: string;
+
+  @ApiProperty({ example: "John Doe", description: "Lead name" })
+  name?: string;
+
+  @ApiProperty({
+    example: "+919876543210",
+    description: "Lead mobile number",
+  })
+  mobile: string;
+
+  @ApiProperty({
+    example: "Karnataka",
+    description: "State or region",
+    required: false,
+  })
+  state?: string;
+
+  @ApiProperty({
+    example: "Bangalore",
+    description: "City",
+    required: false,
+  })
+  city?: string;
+
+  @ApiProperty({
+    example: false,
+    description: "Whether the lead is converted",
+  })
+  converted: boolean;
+
+  @ApiProperty({
+    example: "2026-03-05T10:30:00.000Z",
+    description: "Lead creation timestamp",
+  })
+  createdAt: Date;
+
+  @ApiProperty({
+    example: "2026-03-05T12:45:00.000Z",
+    description: "Lead last update timestamp",
+  })
+  updatedAt: Date;
+}
+
+export class UserDailyActivityResponseDto {
+  @ApiProperty({
+    example: "2026-03-05",
+    description: "The date for which activity is computed (ISO date string)",
+  })
+  date: string;
+
+  @ApiProperty({
+    example: "60d0fe4f5311236168a109cb",
+    description: "Sales executive (non-admin) user ID",
+  })
+  userId: string;
+
+  @ApiProperty({
+    example: "Sales Executive A",
+    description: "Sales executive (non-admin) name",
+  })
+  userName: string;
+
+  @ApiProperty({
+    example: 3,
+    description: "Number of leads created by this user on the given date",
+  })
+  createdCount: number;
+
+  @ApiProperty({
+    example: 5,
+    description:
+      "Number of unique leads that had interactions by this user on the given date",
+  })
+  touchedCount: number;
+
+  @ApiProperty({
+    type: [UserActivityLeadDto],
+    description:
+      "Unique leads the user has either created or interacted with on the given date",
+  })
+  leads: UserActivityLeadDto[];
+
+  @ApiProperty({
+    type: [String],
+    description: "IDs of leads created on the given date by this user",
+  })
+  createdLeadIds: string[];
+
+  @ApiProperty({
+    type: [String],
+    description:
+      "IDs of leads that had at least one interaction by this user on the given date",
+  })
+  interactedLeadIds: string[];
+}
+
 export class SalesSummaryResponseDto {
   @ApiProperty({
     example: 30,

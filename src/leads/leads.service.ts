@@ -25,6 +25,7 @@ export const LEAD_FILTER_ALLOWLIST: Record<
   converted: "boolean",
   gstStatus: "stringExact",
   rating: "number",
+  createdBy: "objectId",
 };
 
 @Injectable()
