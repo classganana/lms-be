@@ -36,8 +36,8 @@ export class Lead {
   createdBy: Types.ObjectId;
 
   // Latest interaction snapshot (optional, can be set on create or updated when interaction is added)
-  @Prop({ required: false, enum: ["CONNECTED", "NOT_CONNECTED", "WRONG"] })
-  callStatus?: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
+  @Prop({ required: false, enum: ["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"] })
+  callStatus?: "CONNECTED" | "NOT_CONNECTED" | "BUSY" | "WRONG" | "WRONG_NUMBER";
 
   @Prop({ required: false, min: 1, max: 5 })
   rating?: number;

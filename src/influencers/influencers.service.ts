@@ -76,18 +76,10 @@ export class InfluencersService {
       throw new ConflictException("Source code already exists");
     }
 
-    // Deactivate previous ACTIVE source codes
-    influencer.sourceCodes.forEach((sc) => {
-      if (sc.status === "ACTIVE") {
-        sc.status = "INACTIVE";
-        sc.deactivatedAt = new Date();
-      }
-    });
-
-    // Add new source code as ACTIVE
+    // Add new source code as INACTIVE - admin activates via UI
     influencer.sourceCodes.push({
       code: addSourceCodeDto.code,
-      status: "ACTIVE",
+      status: "INACTIVE",
       activatedAt: new Date(),
       deactivatedAt: null,
     });
@@ -117,5 +109,33 @@ export class InfluencersService {
     if (!result) {
       throw new NotFoundException("Influencer not found");
     }
+  }
+
+  async updateSourceCodeStatus(
+    id: string,
+    code: string,
+    status: "ACTIVE" | "INACTIVE",
+  ): Promise<InfluencerDocument> {
+    const influencer = await this.influencerModel.findById(id).exec();
+    if (!influencer) {
+      throw new NotFoundException("Influencer not found");
+    }
+
+    const sc = influencer.sourceCodes.find(
+      (s) => s.code.toLowerCase() === code.toLowerCase(),
+    );
+    if (!sc) {
+      throw new NotFoundException("Source code not found");
+    }
+
+    sc.status = status;
+    if (status === "ACTIVE") {
+      sc.activatedAt = new Date();
+      sc.deactivatedAt = null;
+    } else {
+      sc.deactivatedAt = new Date();
+    }
+
+    return influencer.save();
   }
 }

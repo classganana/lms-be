@@ -89,12 +89,12 @@ export class UpdateLeadDto {
 
   @ApiPropertyOptional({
     example: "CONNECTED",
-    enum: ["CONNECTED", "NOT_CONNECTED", "WRONG"],
+    enum: ["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"],
     description: "Latest call status",
   })
-  @IsEnum(["CONNECTED", "NOT_CONNECTED", "WRONG"])
+  @IsEnum(["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"])
   @IsOptional()
-  callStatus?: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
+  callStatus?: "CONNECTED" | "NOT_CONNECTED" | "BUSY" | "WRONG" | "WRONG_NUMBER";
 
   @ApiPropertyOptional({
     example: 4,

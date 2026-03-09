@@ -13,9 +13,9 @@ export class LeadInteraction {
 
   @Prop({
     required: true,
-    enum: ["CONNECTED", "NOT_CONNECTED", "WRONG"],
+    enum: ["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"],
   })
-  callStatus: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
+  callStatus: "CONNECTED" | "NOT_CONNECTED" | "BUSY" | "WRONG" | "WRONG_NUMBER";
 
   @Prop({ required: true, min: 1, max: 5 })
   rating: number;

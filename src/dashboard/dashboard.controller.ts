@@ -133,11 +133,21 @@ export class AdminDashboardController {
 
   @Get("employee-sales")
   @ApiOperation({
-    summary: "Get employee-wise sales totals for the current month",
+    summary: "Get employee-wise sales totals (filtered by date range when provided)",
+  })
+  @ApiQuery({
+    name: "startDate",
+    required: false,
+    description: "Start of date range (ISO 8601)",
+  })
+  @ApiQuery({
+    name: "endDate",
+    required: false,
+    description: "End of date range (ISO 8601)",
   })
   @ApiResponse({
     status: 200,
-    description: "Employee-wise sales for the current month",
+    description: "Employee-wise sales for the date range (or current month if no range)",
     type: EmployeeSalesResponseDto,
   })
   @ApiResponse({
@@ -145,8 +155,11 @@ export class AdminDashboardController {
     description: "Unauthorized - Invalid or missing JWT token",
   })
   @ApiResponse({ status: 403, description: "Forbidden - Admin role required" })
-  async getEmployeeSalesCurrentMonth() {
-    return this.dashboardService.getEmployeeSalesCurrentMonth();
+  async getEmployeeSales(
+    @Query("startDate", new ParseOptionalDatePipe()) startDate?: Date,
+    @Query("endDate", new ParseOptionalDatePipe()) endDate?: Date,
+  ) {
+    return this.dashboardService.getEmployeeSales(startDate, endDate);
   }
 
   @Get("user-activity")

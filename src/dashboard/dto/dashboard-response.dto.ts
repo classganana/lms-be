@@ -187,7 +187,7 @@ export class UserDailyActivityResponseDto {
   @ApiProperty({
     example: 5,
     description:
-      "Number of unique leads that had interactions by this user on the given date",
+      "Follow-up Today: Number of existing leads (created before today) that were updated today. Excludes newly created leads.",
   })
   touchedCount: number;
 

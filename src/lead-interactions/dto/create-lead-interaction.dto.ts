@@ -24,11 +24,11 @@ export class CreateLeadInteractionDto {
   @ApiProperty({
     example: "CONNECTED",
     description: "Call status",
-    enum: ["CONNECTED", "NOT_CONNECTED", "WRONG"],
+    enum: ["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"],
   })
-  @IsEnum(["CONNECTED", "NOT_CONNECTED", "WRONG"])
+  @IsEnum(["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"])
   @IsNotEmpty()
-  callStatus: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
+  callStatus: "CONNECTED" | "NOT_CONNECTED" | "BUSY" | "WRONG" | "WRONG_NUMBER";
 
   @ApiProperty({ example: 4, description: "Rating from 1 to 5" })
   @IsNumber()

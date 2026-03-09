@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { Lead, LeadDocument } from "./schemas/lead.schema";
@@ -6,6 +6,12 @@ import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { Types } from "mongoose";
 import { buildFilter } from "../common/utils/build-filter";
+
+/** Normalize mobile to last 10 digits for duplicate check (handles +91, 91, 0 prefix etc) */
+function normalizeMobile(mobile: string): string {
+  const digits = (mobile || "").replace(/\D/g, "");
+  return digits.slice(-10);
+}
 
 /** Allowlist of filterable keys for leads (generic filter). Add a key here to allow filtering by that field. */
 export const LEAD_FILTER_ALLOWLIST: Record<
@@ -36,13 +42,43 @@ export class LeadsService {
     createLeadDto: CreateLeadDto,
     createdBy: string,
   ): Promise<LeadDocument> {
-    // Check if lead with mobile already exists
-    const existingLead = await this.leadModel
-      .findOne({ mobile: createLeadDto.mobile })
-      .exec();
+    const inputNormalized = normalizeMobile(createLeadDto.mobile);
+    if (inputNormalized.length < 10) {
+      throw new ConflictException({
+        message: "Invalid mobile number",
+      });
+    }
 
-    if (existingLead) {
-      return existingLead;
+    // Check for duplicate - try common formats (9876543210, +919876543210, 919876543210, 09876543210)
+    const variants = [
+      inputNormalized,
+      `+91${inputNormalized}`,
+      `91${inputNormalized}`,
+      `0${inputNormalized}`,
+      createLeadDto.mobile,
+    ].filter((v, i, a) => a.indexOf(v) === i);
+
+    for (const v of variants) {
+      const existing = await this.leadModel.findOne({ mobile: v }).exec();
+      if (existing) {
+        throw new ConflictException({
+          message: "A lead with this mobile number already exists",
+          leadId: String(existing._id),
+        });
+      }
+    }
+
+    // Also check via regex for any mobile ending with these 10 digits (catches stored format variations)
+    const existingByRegex = await this.leadModel
+      .findOne({
+        mobile: new RegExp(`${inputNormalized.replace(/([.*+?^${}()|[\]\\])/g, "\\$1")}\\s*$`),
+      })
+      .exec();
+    if (existingByRegex) {
+      throw new ConflictException({
+        message: "A lead with this mobile number already exists",
+        leadId: String(existingByRegex._id),
+      });
     }
 
     // Create new lead (only mobile is required; other fields optional)
@@ -154,7 +190,7 @@ export class LeadsService {
   async updateSnapshot(
     leadId: string,
     snapshot: {
-      callStatus?: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
+      callStatus?: "CONNECTED" | "NOT_CONNECTED" | "BUSY" | "WRONG" | "WRONG_NUMBER";
       rating?: number;
       notes?: string;
       followUpDate?: Date | null;

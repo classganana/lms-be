@@ -18,10 +18,10 @@ export class LeadInteractionResponseDto {
 
   @ApiProperty({
     example: "CONNECTED",
-    enum: ["CONNECTED", "NOT_CONNECTED", "WRONG"],
+    enum: ["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"],
     description: "Call status",
   })
-  callStatus: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
+  callStatus: "CONNECTED" | "NOT_CONNECTED" | "BUSY" | "WRONG" | "WRONG_NUMBER";
 
   @ApiProperty({
     example: 4,

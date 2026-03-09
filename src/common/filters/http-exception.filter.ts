@@ -43,13 +43,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errorResponse.message = message;
     } else if (message && typeof message === "object") {
       // Handle validation errors and other structured error responses
-      errorResponse.message = (message as any).message || message;
-      if ((message as any).error) {
-        errorResponse.error = (message as any).error;
+      const msgObj = message as Record<string, unknown>;
+      errorResponse.message = msgObj.message || message;
+      if (msgObj.error) {
+        errorResponse.error = msgObj.error;
       }
       // Include validation error details if present
-      if (Array.isArray((message as any).message)) {
-        errorResponse.message = (message as any).message;
+      if (Array.isArray(msgObj.message)) {
+        errorResponse.message = msgObj.message;
+      }
+      // Include extra fields (e.g. leadId for duplicate lead)
+      if (msgObj.leadId !== undefined) {
+        errorResponse.leadId = msgObj.leadId;
       }
     } else {
       errorResponse.message = "Internal server error";

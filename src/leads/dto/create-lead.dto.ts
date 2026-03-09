@@ -59,30 +59,28 @@ export class CreateLeadDto {
   @IsOptional()
   email?: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "60d0fe4f5311236168a109ca",
     description: "Influencer id (mongo id)",
   })
   @IsMongoId()
-  @IsOptional()
-  influencerId?: string;
+  influencerId: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "SRC123",
     description: "Source code assigned to the lead",
   })
   @IsString()
-  @IsOptional()
-  sourceCode?: string;
+  @IsNotEmpty()
+  sourceCode: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "CONNECTED",
-    enum: ["CONNECTED", "NOT_CONNECTED", "WRONG"],
+    enum: ["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"],
     description: "Latest call status",
   })
-  @IsEnum(["CONNECTED", "NOT_CONNECTED", "WRONG"])
-  @IsOptional()
-  callStatus?: "CONNECTED" | "NOT_CONNECTED" | "WRONG";
+  @IsEnum(["CONNECTED", "NOT_CONNECTED", "BUSY", "WRONG", "WRONG_NUMBER"])
+  callStatus: "CONNECTED" | "NOT_CONNECTED" | "BUSY" | "WRONG" | "WRONG_NUMBER";
 
   @ApiPropertyOptional({
     example: 4,
@@ -96,13 +94,13 @@ export class CreateLeadDto {
   @IsOptional()
   rating?: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: "Left a voicemail",
     description: "Notes about the lead",
   })
   @IsString()
-  @IsOptional()
-  notes?: string;
+  @IsNotEmpty()
+  notes: string;
 
   @ApiPropertyOptional({
     example: "2026-02-01T10:00:00Z",

@@ -26,6 +26,7 @@ import { InfluencersService } from "./influencers.service";
 import { CreateInfluencerDto } from "./dto/create-influencer.dto";
 import { UpdateInfluencerDto } from "./dto/update-influencer.dto";
 import { AddSourceCodeDto } from "./dto/add-source-code.dto";
+import { UpdateSourceCodeStatusDto } from "./dto/update-source-code-status.dto";
 import { InfluencerResponseDto } from "./dto/influencer-response.dto";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
@@ -212,6 +213,36 @@ export class AdminInfluencersController {
     @Body() addSourceCodeDto: AddSourceCodeDto,
   ) {
     return this.influencersService.addSourceCode(id, addSourceCodeDto);
+  }
+
+  @Put(":id/source-code/status")
+  @ApiOperation({ summary: "Activate or deactivate a source code (admin only)" })
+  @ApiParam({
+    name: "id",
+    description: "Influencer MongoDB ObjectId",
+    example: "60d0fe4f5311236168a109ca",
+  })
+  @ApiBody({ type: UpdateSourceCodeStatusDto })
+  @ApiResponse({
+    status: 200,
+    description: "Source code status updated",
+    type: InfluencerResponseDto,
+  })
+  @ApiResponse({ status: 404, description: "Influencer or source code not found" })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid or missing JWT token",
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Admin role required" })
+  async updateSourceCodeStatus(
+    @Param("id", ParseMongoIdPipe) id: string,
+    @Body() dto: UpdateSourceCodeStatusDto,
+  ) {
+    return this.influencersService.updateSourceCodeStatus(
+      id,
+      dto.code,
+      dto.status,
+    );
   }
 }
 

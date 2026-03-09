@@ -61,18 +61,18 @@ export class DashboardService {
     const interested = interactions.filter(
       (i) =>
         i.rating >= 3 &&
-        i.callStatus !== "WRONG" &&
+        i.callStatus !== "WRONG" && i.callStatus !== "WRONG_NUMBER" &&
         !convertedLeadIds.has(i.leadId.toString()),
     ).length;
 
     // Non-Interested (rating <= 2 and not wrong number)
     const nonInterested = interactions.filter(
-      (i) => i.rating <= 2 && i.callStatus !== "WRONG",
+      (i) => i.rating <= 2 && i.callStatus !== "WRONG" && i.callStatus !== "WRONG_NUMBER",
     ).length;
 
     // Wrong Numbers
     const wrongNumbers = interactions.filter(
-      (i) => i.callStatus === "WRONG",
+      (i) => i.callStatus === "WRONG" || i.callStatus === "WRONG_NUMBER",
     ).length;
 
     // Pending Leads (leads without any interactions)
@@ -242,66 +242,83 @@ export class DashboardService {
     return sales;
   }
 
-  async getEmployeeSalesCurrentMonth() {
+  async getEmployeeSales(startDate?: Date, endDate?: Date) {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    let dateStart: Date;
+    let dateEnd: Date;
 
-    // Use Lead documents as the source of truth:
-    // sum salesAmount for converted leads created this month, grouped by createdBy.
-    const results = await this.leadModel
+    if (startDate || endDate) {
+      dateStart = startDate
+        ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0)
+        : new Date(0);
+      dateEnd = endDate
+        ? new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999)
+        : new Date(8640000000000000);
+    } else {
+      dateStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      dateEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    }
+
+    const dateFilter = { $gte: dateStart, $lte: dateEnd };
+
+    // 1) Sale model: convert endpoint creates these. Filter by saleDate.
+    const saleResults = await this.saleModel
+      .aggregate([
+        { $match: { saleDate: dateFilter } },
+        { $group: { _id: "$salesExecutiveId", total: { $sum: "$saleAmount" } } },
+      ])
+      .exec();
+
+    // 2) Lead model: LeadForm flow (converted in form) creates these. Filter by updatedAt.
+    const leadResults = await this.leadModel
       .aggregate([
         {
           $match: {
             converted: true,
             salesAmount: { $gt: 0 },
-            createdAt: {
-              $gte: startOfMonth,
-              $lt: startOfNextMonth,
+            updatedAt: dateFilter,
+            // Exclude leads that have a Sale (avoid double-count)
+            _id: {
+              $nin: (
+                await this.saleModel.distinct("leadId", { saleDate: dateFilter })
+              ).map((id: any) => id),
             },
           },
         },
-        {
-          $group: {
-            _id: "$createdBy",
-            totalSalesAmount: { $sum: "$salesAmount" },
-          },
-        },
-        {
-          $lookup: {
-            from: "users",
-            localField: "_id",
-            foreignField: "_id",
-            as: "user",
-          },
-        },
-        {
-          $unwind: {
-            path: "$user",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            name: "$user.name",
-            sales: "$totalSalesAmount",
-          },
-        },
-        {
-          $sort: {
-            sales: -1,
-          },
-        },
+        { $group: { _id: "$createdBy", total: { $sum: "$salesAmount" } } },
       ])
       .exec();
 
+    const merged = new Map<string, number>();
+    for (const r of saleResults) {
+      const id = r._id?.toString();
+      if (id) merged.set(id, (merged.get(id) || 0) + r.total);
+    }
+    for (const r of leadResults) {
+      const id = r._id?.toString();
+      if (id) merged.set(id, (merged.get(id) || 0) + r.total);
+    }
+
+    const userIds = Array.from(merged.keys());
+    const users =
+      userIds.length > 0
+        ? await this.userModel
+            .find({ _id: { $in: userIds.map((id) => new Types.ObjectId(id)) } })
+            .exec()
+        : [];
+
+    const userMap = new Map(users.map((u) => [u._id.toString(), u.name || "Unknown"]));
+    const employees = Array.from(merged.entries())
+      .map(([userId, sales]) => ({
+        id: userId,
+        name: userMap.get(userId) || "Unknown",
+        sales,
+      }))
+      .sort((a, b) => b.sales - a.sales);
+
     return {
-      month: "current",
-      employees: results.map((row: any) => ({
-        name: row.name || "Unknown",
-        sales: row.sales || 0,
-      })),
+      month: startDate || endDate ? "custom" : "current",
+      employees,
     };
   }
 
@@ -365,10 +382,39 @@ export class DashboardService {
     const createdLeadIds = createdLeads.map((l) => l._id.toString());
     const interactedLeadIds = interactedLeadIdStrings;
 
-    // Merge unique leads
+    // Scope: leads created by this user OR has any interaction by this user
+    const [createdByLeadIds, interactedLeadIdsFromInteractions] = await Promise.all([
+      this.leadModel.distinct("_id", { createdBy: execObjectId }),
+      this.leadInteractionModel.distinct("leadId", {
+        salesExecutiveId: execObjectId,
+      }),
+    ]);
+    const allRelevantLeadIds = Array.from(
+      new Set([
+        ...createdByLeadIds.map((id) => id.toString()),
+        ...interactedLeadIdsFromInteractions.map((id) => id.toString()),
+      ]),
+    );
+
+    // Follow-up Today: leads updated today but NOT created today (exclude newly created)
+    const followUpLeads =
+      allRelevantLeadIds.length > 0
+        ? await this.leadModel
+            .find({
+              _id: {
+                $in: allRelevantLeadIds.map((id) => new Types.ObjectId(id)),
+              },
+              updatedAt: { $gte: startOfDay, $lt: endOfDay },
+              createdAt: { $lt: startOfDay },
+            })
+            .exec()
+        : [];
+    const updatedTodayCount = followUpLeads.length;
+
+    // Total Leads Touched = Created Today + Follow-up Today
     const leadMap = new Map<string, LeadDocument>();
     createdLeads.forEach((l) => leadMap.set(l._id.toString(), l));
-    interactedLeads.forEach((l) => leadMap.set(l._id.toString(), l));
+    followUpLeads.forEach((l) => leadMap.set(l._id.toString(), l));
 
     const user = await this.userModel.findById(execObjectId).exec();
 
@@ -377,7 +423,7 @@ export class DashboardService {
       userId: salesExecutiveId,
       userName: user?.name || "Unknown",
       createdCount: createdLeadIds.length,
-      touchedCount: interactedLeadIds.length,
+      touchedCount: updatedTodayCount,
       leads: Array.from(leadMap.values()).map((l) => ({
         id: l._id.toString(),
         name: l.name || "",
@@ -440,14 +486,14 @@ export class DashboardService {
     const interested = interactions.filter(
       (i) =>
         i.rating >= 3 &&
-        i.callStatus !== "WRONG" &&
+        i.callStatus !== "WRONG" && i.callStatus !== "WRONG_NUMBER" &&
         !convertedLeadIds.has(i.leadId.toString()),
     ).length;
     const nonInterested = interactions.filter(
-      (i) => i.rating <= 2 && i.callStatus !== "WRONG",
+      (i) => i.rating <= 2 && i.callStatus !== "WRONG" && i.callStatus !== "WRONG_NUMBER",
     ).length;
     const wrongNumbers = interactions.filter(
-      (i) => i.callStatus === "WRONG",
+      (i) => i.callStatus === "WRONG" || i.callStatus === "WRONG_NUMBER",
     ).length;
 
     // For pending leads, we need to check leads created by this executive that don't have interactions
