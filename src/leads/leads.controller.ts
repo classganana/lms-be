@@ -9,6 +9,7 @@ import {
   Param,
   UseGuards,
   NotFoundException,
+  ForbiddenException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -166,7 +167,10 @@ export class LeadsController {
     status: 401,
     description: "Unauthorized - Invalid or missing JWT token",
   })
-  async findAll(@Query() query: Record<string, string>) {
+  async findAll(
+    @Query() query: Record<string, string>,
+    @CurrentUser() user: { id: string; role: string },
+  ) {
     const allowedSort = ["createdAt", "updatedAt", "name"];
     const sortBy = query.sortBy;
     const sortOrder = query.sortOrder;
@@ -179,16 +183,24 @@ export class LeadsController {
       query.page && limitNum
         ? (Math.max(1, parseInt(query.page, 10) || 1) - 1) * limitNum
         : undefined;
-    // Map salesExecutiveId -> createdBy so we can reuse generic filtering
+    // Non-admin: can only see their own leads. Admin: can see all (or filter by salesExecutiveId).
+    const createdByFilter =
+      user?.role === "ADMIN"
+        ? query.salesExecutiveId || null
+        : user?.id != null
+          ? String(user.id)
+          : null;
+
     const queryWithOwner = {
       ...query,
-      ...(query.salesExecutiveId
+      ...(query.salesExecutiveId && user?.role === "ADMIN"
         ? { createdBy: query.salesExecutiveId }
         : {}),
     };
     const filter = getFilterQuery(queryWithOwner, LEAD_FILTER_ALLOWLIST);
     const opts = {
       sort,
+      createdByFilter,
       ...(limitNum !== undefined || skip !== undefined
         ? { skip, limit: limitNum }
         : {}),
@@ -215,10 +227,19 @@ export class LeadsController {
     status: 401,
     description: "Unauthorized - Invalid or missing JWT token",
   })
-  async findByMobile(@Query("mobile") mobile: string) {
+  async findByMobile(
+    @Query("mobile") mobile: string,
+    @CurrentUser() user: { id: string; role: string },
+  ) {
     const lead = await this.leadsService.findByMobile(mobile);
     if (!lead) {
       throw new NotFoundException("Lead not found");
+    }
+    if (user.role !== "ADMIN") {
+      const ownerId = (lead as any).createdBy?.toString?.();
+      if (ownerId !== user.id) {
+        throw new NotFoundException("Lead not found");
+      }
     }
     return lead;
   }
@@ -240,10 +261,19 @@ export class LeadsController {
     status: 401,
     description: "Unauthorized - Invalid or missing JWT token",
   })
-  async findOne(@Param("id", ParseMongoIdPipe) id: string) {
+  async findOne(
+    @Param("id", ParseMongoIdPipe) id: string,
+    @CurrentUser() user: { id: string; role: string },
+  ) {
     const lead = await this.leadsService.findOne(id);
     if (!lead) {
       throw new NotFoundException("Lead not found");
+    }
+    if (user.role !== "ADMIN") {
+      const ownerId = (lead as any).createdBy?.toString?.();
+      if (ownerId !== user.id) {
+        throw new ForbiddenException("You do not have access to this lead");
+      }
     }
     return lead;
   }
@@ -295,11 +325,19 @@ export class LeadsController {
   async update(
     @Param("id", ParseMongoIdPipe) id: string,
     @Body() updateLeadDto: UpdateLeadDto,
+    @CurrentUser() user: { id: string; role: string },
   ) {
-    const lead = await this.leadsService.update(id, updateLeadDto);
-    if (!lead) {
+    const existing = await this.leadsService.findOne(id);
+    if (!existing) {
       throw new NotFoundException("Lead not found");
     }
+    if (user.role !== "ADMIN") {
+      const ownerId = (existing as any).createdBy?.toString?.();
+      if (ownerId !== user.id) {
+        throw new ForbiddenException("You do not have access to this lead");
+      }
+    }
+    const lead = await this.leadsService.update(id, updateLeadDto);
     return lead;
   }
 
@@ -314,7 +352,20 @@ export class LeadsController {
   })
   @ApiResponse({ status: 200, description: "Lead deleted successfully" })
   @ApiResponse({ status: 404, description: "Lead not found" })
-  async remove(@Param("id", ParseMongoIdPipe) id: string) {
+  async remove(
+    @Param("id", ParseMongoIdPipe) id: string,
+    @CurrentUser() user: { id: string; role: string },
+  ) {
+    const existing = await this.leadsService.findOne(id);
+    if (!existing) {
+      throw new NotFoundException("Lead not found");
+    }
+    if (user.role !== "ADMIN") {
+      const ownerId = (existing as any).createdBy?.toString?.();
+      if (ownerId !== user.id) {
+        throw new ForbiddenException("You do not have access to this lead");
+      }
+    }
     const lead = await this.leadsService.remove(id);
     if (!lead) {
       throw new NotFoundException("Lead not found");

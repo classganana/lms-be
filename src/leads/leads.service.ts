@@ -62,8 +62,8 @@ export class LeadsService {
       const existing = await this.leadModel.findOne({ mobile: v }).exec();
       if (existing) {
         throw new ConflictException({
-          message: "A lead with this mobile number already exists",
-          leadId: String(existing._id),
+          message:
+            "A lead with this mobile number already exists. Each lead is managed by one team member; duplicates are not allowed.",
         });
       }
     }
@@ -76,8 +76,8 @@ export class LeadsService {
       .exec();
     if (existingByRegex) {
       throw new ConflictException({
-        message: "A lead with this mobile number already exists",
-        leadId: String(existingByRegex._id),
+        message:
+          "A lead with this mobile number already exists. Each lead is managed by one team member; duplicates are not allowed.",
       });
     }
 
@@ -167,11 +167,17 @@ export class LeadsService {
     sort?: Record<string, 1 | -1>;
     /** Generic filter: only keys in LEAD_FILTER_ALLOWLIST are applied. */
     filter?: Record<string, string>;
+    /** When set (e.g. for non-admin), restricts results to leads created by this user ID. Takes precedence over filter.createdBy. */
+    createdByFilter?: string | null;
   }): Promise<LeadDocument[]> {
-    const mongoFilter =
+    const baseFilter =
       opts?.filter && Object.keys(opts.filter).length
         ? buildFilter(opts.filter, LEAD_FILTER_ALLOWLIST)
         : {};
+    const mongoFilter = { ...baseFilter };
+    if (opts?.createdByFilter && Types.ObjectId.isValid(opts.createdByFilter)) {
+      mongoFilter.createdBy = new Types.ObjectId(opts.createdByFilter);
+    }
     let q = this.leadModel.find(mongoFilter);
     if (opts?.sort && Object.keys(opts.sort).length) {
       q = q.sort(opts.sort);
