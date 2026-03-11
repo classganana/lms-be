@@ -237,7 +237,7 @@ export class LeadsController {
     }
     if (user.role !== "ADMIN") {
       const ownerId = (lead as any).createdBy?.toString?.();
-      if (ownerId !== user.id) {
+      if (String(ownerId) !== String(user?.id)) {
         throw new NotFoundException("Lead not found");
       }
     }
@@ -271,7 +271,7 @@ export class LeadsController {
     }
     if (user.role !== "ADMIN") {
       const ownerId = (lead as any).createdBy?.toString?.();
-      if (ownerId !== user.id) {
+      if (String(ownerId) !== String(user?.id)) {
         throw new ForbiddenException("You do not have access to this lead");
       }
     }
@@ -333,7 +333,7 @@ export class LeadsController {
     }
     if (user.role !== "ADMIN") {
       const ownerId = (existing as any).createdBy?.toString?.();
-      if (ownerId !== user.id) {
+      if (String(ownerId) !== String(user?.id)) {
         throw new ForbiddenException("You do not have access to this lead");
       }
     }
@@ -362,7 +362,7 @@ export class LeadsController {
     }
     if (user.role !== "ADMIN") {
       const ownerId = (existing as any).createdBy?.toString?.();
-      if (ownerId !== user.id) {
+      if (String(ownerId) !== String(user?.id)) {
         throw new ForbiddenException("You do not have access to this lead");
       }
     }

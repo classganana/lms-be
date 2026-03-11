@@ -65,15 +65,14 @@ export class InfluencersService {
       throw new NotFoundException("Influencer not found");
     }
 
-    // Check if source code already exists globally
-    const existingInfluencer = await this.influencerModel
-      .findOne({
-        "sourceCodes.code": addSourceCodeDto.code,
-      })
-      .exec();
-
-    if (existingInfluencer) {
-      throw new ConflictException("Source code already exists");
+    // Check if this influencer already has this source code (unique per influencer only)
+    const alreadyHasCode = (influencer.sourceCodes ?? []).some(
+      (sc) => sc.code.toLowerCase() === addSourceCodeDto.code.toLowerCase(),
+    );
+    if (alreadyHasCode) {
+      throw new ConflictException(
+        "This source code already exists for this influencer",
+      );
     }
 
     // Add new source code as INACTIVE - admin activates via UI
@@ -83,6 +82,26 @@ export class InfluencersService {
       activatedAt: new Date(),
       deactivatedAt: null,
     });
+
+    return influencer.save();
+  }
+
+  async deleteSourceCode(
+    id: string,
+    code: string,
+  ): Promise<InfluencerDocument> {
+    const influencer = await this.influencerModel.findById(id).exec();
+    if (!influencer) {
+      throw new NotFoundException("Influencer not found");
+    }
+
+    const initialLen = (influencer.sourceCodes ?? []).length;
+    influencer.sourceCodes = (influencer.sourceCodes ?? []).filter(
+      (sc) => sc.code.toLowerCase() !== code.toLowerCase(),
+    );
+    if (influencer.sourceCodes.length === initialLen) {
+      throw new NotFoundException("Source code not found");
+    }
 
     return influencer.save();
   }

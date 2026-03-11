@@ -58,14 +58,25 @@ export class LeadsService {
       createLeadDto.mobile,
     ].filter((v, i, a) => a.indexOf(v) === i);
 
-    for (const v of variants) {
-      const existing = await this.leadModel.findOne({ mobile: v }).exec();
-      if (existing) {
+    const checkExisting = async (existing: LeadDocument | null) => {
+      if (!existing) return;
+      const isSameOwner =
+        String((existing as any).createdBy) === String(createdBy);
+      if (isSameOwner) {
         throw new ConflictException({
-          message:
-            "A lead with this mobile number already exists. Each lead is managed by one team member; duplicates are not allowed.",
+          message: "Lead already exists - redirecting to edit",
+          leadId: String(existing._id),
         });
       }
+      throw new ConflictException({
+        message:
+          "A lead with this mobile number already exists. Each lead is managed by one team member; duplicates are not allowed.",
+      });
+    };
+
+    for (const v of variants) {
+      const existing = await this.leadModel.findOne({ mobile: v }).exec();
+      await checkExisting(existing);
     }
 
     // Also check via regex for any mobile ending with these 10 digits (catches stored format variations)
@@ -74,12 +85,7 @@ export class LeadsService {
         mobile: new RegExp(`${inputNormalized.replace(/([.*+?^${}()|[\]\\])/g, "\\$1")}\\s*$`),
       })
       .exec();
-    if (existingByRegex) {
-      throw new ConflictException({
-        message:
-          "A lead with this mobile number already exists. Each lead is managed by one team member; duplicates are not allowed.",
-      });
-    }
+    await checkExisting(existingByRegex);
 
     // Create new lead (only mobile is required; other fields optional)
     const payload: Record<string, unknown> = {

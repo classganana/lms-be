@@ -215,6 +215,38 @@ export class AdminInfluencersController {
     return this.influencersService.addSourceCode(id, addSourceCodeDto);
   }
 
+  @Delete(":id/source-code")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Delete a source code from influencer (admin only)" })
+  @ApiParam({
+    name: "id",
+    description: "Influencer MongoDB ObjectId",
+    example: "60d0fe4f5311236168a109ca",
+  })
+  @ApiQuery({
+    name: "code",
+    required: true,
+    description: "Source code to delete",
+    example: "insta",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Source code deleted",
+    type: InfluencerResponseDto,
+  })
+  @ApiResponse({ status: 404, description: "Influencer or source code not found" })
+  @ApiResponse({
+    status: 401,
+    description: "Unauthorized - Invalid or missing JWT token",
+  })
+  @ApiResponse({ status: 403, description: "Forbidden - Admin role required" })
+  async deleteSourceCode(
+    @Param("id", ParseMongoIdPipe) id: string,
+    @Query("code") code: string,
+  ) {
+    return this.influencersService.deleteSourceCode(id, code);
+  }
+
   @Put(":id/source-code/status")
   @ApiOperation({ summary: "Activate or deactivate a source code (admin only)" })
   @ApiParam({
