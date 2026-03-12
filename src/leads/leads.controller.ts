@@ -54,7 +54,7 @@ export class LeadsController {
       "- `sourceCode` — substring match, case-insensitive\n" +
       "- `callStatus` — exact: CONNECTED | NOT_CONNECTED | WRONG\n" +
       "- `converted` — exact: true | false\n" +
-      "- `gstStatus` — exact: APPLIED | YES | NO\n" +
+      "- `gstStatus` — exact: YES | NO | APPLIED | APPLIED_THROUGH_US\n" +
       "- `rating` — exact number (1–5)\n\n" +
       "Example: GET /sales/leads?state=Karnataka&converted=false&limit=20",
   })
@@ -144,7 +144,7 @@ export class LeadsController {
   @ApiQuery({
     name: "gstStatus",
     required: false,
-    enum: ["APPLIED", "YES", "NO"],
+    enum: ["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"],
     description: "Filter: GST status (exact)",
   })
   @ApiQuery({
@@ -197,7 +197,12 @@ export class LeadsController {
         ? { createdBy: query.salesExecutiveId }
         : {}),
     };
-    const filter = getFilterQuery(queryWithOwner, LEAD_FILTER_ALLOWLIST);
+    let filter = getFilterQuery(queryWithOwner, LEAD_FILTER_ALLOWLIST);
+    // Admin viewing all: never filter by createdBy from query (only use salesExecutiveId when explicitly requested)
+    if (user?.role === "ADMIN" && !query.salesExecutiveId && filter.createdBy) {
+      const { createdBy: _, ...rest } = filter;
+      filter = rest;
+    }
     const opts = {
       sort,
       createdByFilter,

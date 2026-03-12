@@ -134,12 +134,12 @@ export class UpdateLeadDto {
 
   @ApiPropertyOptional({
     example: "NO",
-    enum: ["APPLIED", "YES", "NO"],
-    description: "GST status: APPLIED | YES | NO",
+    enum: ["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"],
+    description: "GST status: YES | NO | APPLIED | APPLIED_THROUGH_US",
   })
-  @IsEnum(["APPLIED", "YES", "NO"])
+  @IsEnum(["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"])
   @IsOptional()
-  gstStatus?: "APPLIED" | "YES" | "NO";
+  gstStatus?: "YES" | "NO" | "APPLIED" | "APPLIED_THROUGH_US";
 
   @ApiPropertyOptional({
     example: null,

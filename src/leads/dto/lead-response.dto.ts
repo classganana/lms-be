@@ -73,10 +73,10 @@ export class LeadResponseDto {
 
   @ApiPropertyOptional({
     example: "NO",
-    enum: ["APPLIED", "YES", "NO"],
+    enum: ["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"],
     description: "GST status",
   })
-  gstStatus?: "APPLIED" | "YES" | "NO";
+  gstStatus?: "YES" | "NO" | "APPLIED" | "APPLIED_THROUGH_US";
 
   @ApiPropertyOptional({
     example: null,

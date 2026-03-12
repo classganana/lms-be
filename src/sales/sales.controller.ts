@@ -42,7 +42,7 @@ export class SalesController {
       "**Filter keys (pass as query params, e.g. ?influencerId=xxx&gstStatus=YES):**\n" +
       "- `influencerId` — exact (MongoDB ObjectId)\n" +
       "- `sourceCode` — substring match, case-insensitive\n" +
-      "- `gstStatus` — exact: APPLIED | YES | NO\n" +
+      "- `gstStatus` — exact: APPLIED | APPLIED_THROUGH_US | YES | NO\n" +
       "- `leadId` — exact (MongoDB ObjectId)\n" +
       "- `saleAmount` — exact number\n" +
       "- `mobile` — lead’s mobile; resolved to leadId (exact match on lead)\n" +
@@ -89,7 +89,7 @@ export class SalesController {
   @ApiQuery({
     name: "gstStatus",
     required: false,
-    enum: ["APPLIED", "YES", "NO"],
+    enum: ["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"],
     description: "Filter: GST status (exact)",
   })
   @ApiQuery({
@@ -182,7 +182,7 @@ export class SalesController {
       "**Filter keys (pass as query params, e.g. ?influencerId=xxx&gstStatus=YES):**\n" +
       "- `influencerId` — exact (MongoDB ObjectId)\n" +
       "- `sourceCode` — substring match, case-insensitive\n" +
-      "- `gstStatus` — exact: APPLIED | YES | NO\n" +
+      "- `gstStatus` — exact: APPLIED | APPLIED_THROUGH_US | YES | NO\n" +
       "- `leadId` — exact (MongoDB ObjectId)\n" +
       "- `saleAmount` — exact number\n" +
       "- `mobile` — lead’s mobile; resolved to leadId (exact match on lead)\n" +
@@ -229,7 +229,7 @@ export class SalesController {
   @ApiQuery({
     name: "gstStatus",
     required: false,
-    enum: ["APPLIED", "YES", "NO"],
+    enum: ["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"],
     description: "Filter: GST status (exact)",
   })
   @ApiQuery({

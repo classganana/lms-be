@@ -51,9 +51,9 @@ export class Lead {
   @Prop({ default: false })
   converted: boolean;
 
-  /** GST status: APPLIED | YES | NO. Legacy gstCustomer (boolean) kept for backward compat. */
-  @Prop({ required: false, enum: ["APPLIED", "YES", "NO"], default: "NO" })
-  gstStatus?: "APPLIED" | "YES" | "NO";
+  /** GST status: YES | NO | APPLIED | APPLIED_THROUGH_US. Legacy gstCustomer (boolean) kept for backward compat. */
+  @Prop({ required: false, enum: ["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"], default: "NO" })
+  gstStatus?: "YES" | "NO" | "APPLIED" | "APPLIED_THROUGH_US";
 
   @Prop({ required: false })
   gstCustomer?: boolean; // deprecated, use gstStatus

@@ -20,8 +20,8 @@ export class Sale {
   @Prop({ required: true })
   saleAmount: number;
 
-  @Prop({ required: false, enum: ["APPLIED", "YES", "NO"] })
-  gstStatus?: "APPLIED" | "YES" | "NO";
+  @Prop({ required: false, enum: ["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"] })
+  gstStatus?: "APPLIED" | "APPLIED_THROUGH_US" | "YES" | "NO";
 
   @Prop({ required: false })
   gstCustomer?: boolean; // deprecated, use gstStatus

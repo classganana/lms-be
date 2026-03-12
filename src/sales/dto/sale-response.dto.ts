@@ -27,10 +27,10 @@ export class SaleResponseDto {
 
   @ApiProperty({
     example: "YES",
-    enum: ["APPLIED", "YES", "NO"],
+    enum: ["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"],
     description: "GST status",
   })
-  gstStatus?: "APPLIED" | "YES" | "NO";
+  gstStatus?: "APPLIED" | "APPLIED_THROUGH_US" | "YES" | "NO";
 
   @ApiProperty({
     example: "2026-01-22T16:07:52.623Z",

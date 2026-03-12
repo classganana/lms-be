@@ -55,12 +55,12 @@ export class CreateLeadInteractionDto {
 
   @ApiPropertyOptional({
     example: "NO",
-    enum: ["APPLIED", "YES", "NO"],
-    description: "GST status: APPLIED | YES | NO",
+    enum: ["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"],
+    description: "GST status: APPLIED | APPLIED_THROUGH_US | YES | NO",
   })
-  @IsEnum(["APPLIED", "YES", "NO"])
+  @IsEnum(["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"])
   @IsOptional()
-  gstStatus?: "APPLIED" | "YES" | "NO";
+  gstStatus?: "APPLIED" | "APPLIED_THROUGH_US" | "YES" | "NO";
 
   @ApiPropertyOptional({
     example: false,

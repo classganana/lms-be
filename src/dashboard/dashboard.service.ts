@@ -10,9 +10,9 @@ import { Sale, SaleDocument } from "../sales/schemas/sale.schema";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import { Types } from "mongoose";
 
-/** Count sale as GST customer: gstStatus YES/APPLIED or legacy gstCustomer true */
+/** Count sale as GST customer: gstStatus YES/APPLIED/APPLIED_THROUGH_US or legacy gstCustomer true */
 function isGstCustomer(sale: SaleDocument): boolean {
-  if (sale.gstStatus === "YES" || sale.gstStatus === "APPLIED") return true;
+  if (sale.gstStatus === "YES" || sale.gstStatus === "APPLIED" || sale.gstStatus === "APPLIED_THROUGH_US") return true;
   if ((sale as any).gstCustomer === true) return true; // backward compat
   return false;
 }
@@ -323,25 +323,29 @@ export class DashboardService {
   }
 
   async getUserDailyActivity(salesExecutiveId: string, date?: Date) {
-    // Normalize to given date's start/end (or today if not provided)
+    // Normalize to given date's start/end in UTC (or today if not provided) so server timezone doesn't shift the day
     const target = date ? new Date(date) : new Date();
     const startOfDay = new Date(
-      target.getFullYear(),
-      target.getMonth(),
-      target.getDate(),
-      0,
-      0,
-      0,
-      0,
+      Date.UTC(
+        target.getUTCFullYear(),
+        target.getUTCMonth(),
+        target.getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
     );
     const endOfDay = new Date(
-      target.getFullYear(),
-      target.getMonth(),
-      target.getDate() + 1,
-      0,
-      0,
-      0,
-      0,
+      Date.UTC(
+        target.getUTCFullYear(),
+        target.getUTCMonth(),
+        target.getUTCDate() + 1,
+        0,
+        0,
+        0,
+        0,
+      ),
     );
 
     const execObjectId = new Types.ObjectId(salesExecutiveId);

@@ -29,8 +29,8 @@ export class LeadInteraction {
   @Prop({ default: false })
   converted: boolean;
 
-  @Prop({ required: false, enum: ["APPLIED", "YES", "NO"], default: "NO" })
-  gstStatus?: "APPLIED" | "YES" | "NO";
+  @Prop({ required: false, enum: ["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"], default: "NO" })
+  gstStatus?: "APPLIED" | "APPLIED_THROUGH_US" | "YES" | "NO";
 
   @Prop({ required: false })
   gstCustomer?: boolean; // deprecated, use gstStatus

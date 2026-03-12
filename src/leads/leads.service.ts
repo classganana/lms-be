@@ -183,6 +183,9 @@ export class LeadsService {
     const mongoFilter = { ...baseFilter };
     if (opts?.createdByFilter && Types.ObjectId.isValid(opts.createdByFilter)) {
       mongoFilter.createdBy = new Types.ObjectId(opts.createdByFilter);
+    } else if (opts?.createdByFilter === null) {
+      // Admin requesting all leads: do not filter by createdBy even if it leaked into query params
+      delete mongoFilter.createdBy;
     }
     let q = this.leadModel.find(mongoFilter);
     if (opts?.sort && Object.keys(opts.sort).length) {
@@ -207,7 +210,7 @@ export class LeadsService {
       notes?: string;
       followUpDate?: Date | null;
       converted?: boolean;
-      gstStatus?: "APPLIED" | "YES" | "NO";
+      gstStatus?: "APPLIED" | "APPLIED_THROUGH_US" | "YES" | "NO";
     },
   ): Promise<LeadDocument | null> {
     const toSet: Record<string, unknown> = {};

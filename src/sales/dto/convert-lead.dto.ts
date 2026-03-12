@@ -28,12 +28,12 @@ export class ConvertLeadDto {
 
   @ApiProperty({
     example: "YES",
-    enum: ["APPLIED", "YES", "NO"],
-    description: "GST status: APPLIED | YES | NO",
+    enum: ["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"],
+    description: "GST status: APPLIED | APPLIED_THROUGH_US | YES | NO",
   })
-  @IsEnum(["APPLIED", "YES", "NO"])
+  @IsEnum(["APPLIED", "APPLIED_THROUGH_US", "YES", "NO"])
   @IsNotEmpty()
-  gstStatus: "APPLIED" | "YES" | "NO";
+  gstStatus: "APPLIED" | "APPLIED_THROUGH_US" | "YES" | "NO";
 
   @ApiProperty({
     example: "2026-01-21T10:00:00Z",
