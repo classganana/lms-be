@@ -51,6 +51,10 @@ export class Lead {
   @Prop({ default: false })
   converted: boolean;
 
+  /** Set once when the lead first becomes converted; used for month-wise conversion reporting (immutable after set). */
+  @Prop({ required: false })
+  conversionDate?: Date;
+
   /** GST status: YES | NO | APPLIED | APPLIED_THROUGH_US. Legacy gstCustomer (boolean) kept for backward compat. */
   @Prop({ required: false, enum: ["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"], default: "NO" })
   gstStatus?: "YES" | "NO" | "APPLIED" | "APPLIED_THROUGH_US";
@@ -60,6 +64,10 @@ export class Lead {
 
   @Prop({ required: false })
   salesAmount?: number | null;
+
+  /** Whether payment-related information has been shared with the lead */
+  @Prop({ default: false })
+  paymentInfoShared?: boolean;
 
   createdAt?: Date;
   updatedAt?: Date;

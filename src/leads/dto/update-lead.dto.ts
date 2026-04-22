@@ -148,5 +148,13 @@ export class UpdateLeadDto {
   @IsNumber()
   @IsOptional()
   salesAmount?: number | null;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: "Whether payment information has been shared with the lead",
+  })
+  @IsBoolean()
+  @IsOptional()
+  paymentInfoShared?: boolean;
 }
 

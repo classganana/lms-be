@@ -33,6 +33,7 @@ export class LeadInteractionsService {
     });
 
     // Keep Lead document in sync with latest interaction snapshot
+    const markConverted = createLeadInteractionDto.converted ?? false;
     await this.leadsService.updateSnapshot(createLeadInteractionDto.leadId, {
       callStatus: createLeadInteractionDto.callStatus,
       rating: createLeadInteractionDto.rating,
@@ -40,7 +41,10 @@ export class LeadInteractionsService {
       followUpDate: createLeadInteractionDto.followUpDate
         ? new Date(createLeadInteractionDto.followUpDate)
         : undefined,
-      converted: createLeadInteractionDto.converted ?? false,
+      converted: markConverted,
+      conversionAt: markConverted
+        ? new Date(interaction.createdAt ?? Date.now())
+        : undefined,
       gstStatus: createLeadInteractionDto.gstStatus ?? "NO",
     });
 

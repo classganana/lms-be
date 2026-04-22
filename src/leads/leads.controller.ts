@@ -29,6 +29,12 @@ import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { ParseMongoIdPipe } from "../common/pipes/parse-mongo-id.pipe";
 import { getFilterQuery } from "../common/utils/build-filter";
 
+/** Last 10 digits for comparing mobile across formatting differences */
+function mobileKey(mobile: string | undefined): string {
+  const digits = (mobile ?? "").replace(/\D/g, "");
+  return digits.slice(-10);
+}
+
 @Controller("sales/leads")
 @ApiTags("Leads")
 @ApiBearerAuth("bearer")
@@ -55,6 +61,7 @@ export class LeadsController {
       "- `callStatus` — exact: CONNECTED | NOT_CONNECTED | WRONG\n" +
       "- `converted` — exact: true | false\n" +
       "- `gstStatus` — exact: YES | NO | APPLIED | APPLIED_THROUGH_US\n" +
+      "- `paymentInfoShared` — exact: true | false\n" +
       "- `rating` — exact number (1–5)\n\n" +
       "Example: GET /sales/leads?state=Karnataka&converted=false&limit=20",
   })
@@ -146,6 +153,12 @@ export class LeadsController {
     required: false,
     enum: ["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"],
     description: "Filter: GST status (exact)",
+  })
+  @ApiQuery({
+    name: "paymentInfoShared",
+    required: false,
+    enum: ["true", "false"],
+    description: "Filter: payment information shared with lead (exact)",
   })
   @ApiQuery({
     name: "rating",
@@ -327,6 +340,10 @@ export class LeadsController {
     status: 400,
     description: "Bad request - validation error",
   })
+  @ApiResponse({
+    status: 403,
+    description: "Forbidden — e.g. non-admin cannot change mobile number",
+  })
   async update(
     @Param("id", ParseMongoIdPipe) id: string,
     @Body() updateLeadDto: UpdateLeadDto,
@@ -340,6 +357,14 @@ export class LeadsController {
       const ownerId = (existing as any).createdBy?.toString?.();
       if (String(ownerId) !== String(user?.id)) {
         throw new ForbiddenException("You do not have access to this lead");
+      }
+      if (updateLeadDto.mobile !== undefined) {
+        const existingMobile = String((existing as any).mobile ?? "");
+        if (mobileKey(existingMobile) !== mobileKey(updateLeadDto.mobile)) {
+          throw new ForbiddenException(
+            "Only administrators can change a lead's mobile number",
+          );
+        }
       }
     }
     const lead = await this.leadsService.update(id, updateLeadDto);

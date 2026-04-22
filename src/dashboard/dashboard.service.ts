@@ -17,6 +17,25 @@ function isGstCustomer(sale: SaleDocument): boolean {
   return false;
 }
 
+/** Local calendar month bounds (same convention as getEmployeeSales default range). */
+function calendarMonthBoundsLocal(ref = new Date()): {
+  dateStart: Date;
+  dateEnd: Date;
+} {
+  return {
+    dateStart: new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0),
+    dateEnd: new Date(
+      ref.getFullYear(),
+      ref.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    ),
+  };
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -26,6 +45,63 @@ export class DashboardService {
     @InjectModel(Sale.name) private saleModel: Model<SaleDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
+
+  /**
+   * Revenue attributed to conversions in [dateStart, dateEnd] (by lead.conversionDate).
+   * Sale rows: current saleAmount on Sale, only if a Lead still exists ($lookup + unwind).
+   * Lead-only: converted leads with salesAmount and no Sale document, same conversion window.
+   */
+  private async sumRevenueByConversionWindow(
+    dateStart: Date,
+    dateEnd: Date,
+    salesExecutiveId?: Types.ObjectId,
+  ): Promise<number> {
+    const convWindow = { $gte: dateStart, $lte: dateEnd };
+    const salePreMatch: Record<string, unknown> = {};
+    if (salesExecutiveId) {
+      salePreMatch.salesExecutiveId = salesExecutiveId;
+    }
+
+    const fromSalesAgg = await this.saleModel
+      .aggregate([
+        { $match: salePreMatch },
+        {
+          $lookup: {
+            from: this.leadModel.collection.name,
+            localField: "leadId",
+            foreignField: "_id",
+            as: "lead",
+          },
+        },
+        { $unwind: "$lead" },
+        { $match: { "lead.conversionDate": convWindow } },
+        { $group: { _id: null, total: { $sum: "$saleAmount" } } },
+      ])
+      .exec();
+
+    const allSaleLeadIds = (
+      (await this.saleModel.distinct("leadId")) as unknown[]
+    ).filter((id) => id != null) as Types.ObjectId[];
+
+    const leadMatch: Record<string, unknown> = {
+      converted: true,
+      salesAmount: { $gt: 0 },
+      conversionDate: convWindow,
+      _id: { $nin: allSaleLeadIds },
+    };
+    if (salesExecutiveId) leadMatch.createdBy = salesExecutiveId;
+
+    const fromLeadsAgg = await this.leadModel
+      .aggregate([
+        { $match: leadMatch },
+        { $group: { _id: null, total: { $sum: "$salesAmount" } } },
+      ])
+      .exec();
+
+    const fromSales = (fromSalesAgg[0]?.total as number) ?? 0;
+    const fromLeads = (fromLeadsAgg[0]?.total as number) ?? 0;
+    return fromSales + fromLeads;
+  }
 
   async getAdminSummary(startDate?: Date, endDate?: Date) {
     const dateMatch: any = {};
@@ -101,6 +177,21 @@ export class DashboardService {
     const gstCustomersPercentage =
       totalSales > 0 ? (gstCustomers / totalSales) * 100 : 0;
 
+    const conversionMatch: any = { converted: true };
+    if (startDate || endDate) {
+      conversionMatch.conversionDate = {};
+      if (startDate) conversionMatch.conversionDate.$gte = startDate;
+      if (endDate) conversionMatch.conversionDate.$lte = endDate;
+    }
+    const conversionsInPeriod =
+      await this.leadModel.countDocuments(conversionMatch);
+
+    const { dateStart, dateEnd } = calendarMonthBoundsLocal();
+    const thisMonthRevenue = await this.sumRevenueByConversionWindow(
+      dateStart,
+      dateEnd,
+    );
+
     return {
       totalLeads,
       interested,
@@ -110,6 +201,8 @@ export class DashboardService {
       totalSales,
       totalRevenue,
       gstCustomersPercentage: parseFloat(gstCustomersPercentage.toFixed(2)),
+      conversionsInPeriod,
+      thisMonthRevenue: parseFloat(thisMonthRevenue.toFixed(2)),
     };
   }
 
@@ -269,15 +362,15 @@ export class DashboardService {
       ])
       .exec();
 
-    // 2) Lead model: LeadForm flow (converted in form) creates these. Filter by updatedAt.
+    // 2) Lead model: revenue recorded on lead without a Sale row in this window. Bucket by conversionDate.
     const leadResults = await this.leadModel
       .aggregate([
         {
           $match: {
             converted: true,
             salesAmount: { $gt: 0 },
-            updatedAt: dateFilter,
-            // Exclude leads that have a Sale (avoid double-count)
+            conversionDate: dateFilter,
+            // Exclude leads that have a Sale in this period (those are counted via saleDate above)
             _id: {
               $nin: (
                 await this.saleModel.distinct("leadId", { saleDate: dateFilter })
@@ -522,24 +615,94 @@ export class DashboardService {
       (l) => !allLeadIdsWithInteractions.has(l._id.toString()),
     ).length;
 
-    // Sales
+    const execOid = new Types.ObjectId(salesExecutiveId);
+
+    // Sales (table rows always scoped to this executive via saleDateMatch)
     const sales = await this.saleModel.find(saleDateMatch).exec();
-    const totalSales = sales.length;
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.saleAmount, 0);
+    let totalSales = sales.length;
+    let totalRevenue = sales.reduce((sum, sale) => sum + sale.saleAmount, 0);
+
+    // All-time totals: add revenue on leads they own with no Sale row (same attribution as employee-sales)
+    if (!startDate && !endDate) {
+      const allLeadIdsWithSale = (
+        (await this.saleModel.distinct("leadId")) as unknown[]
+      ).filter((id) => id != null) as Types.ObjectId[];
+      const [leadOnlyRow] = await this.leadModel
+        .aggregate([
+          {
+            $match: {
+              converted: true,
+              salesAmount: { $gt: 0 },
+              createdBy: execOid,
+              _id: { $nin: allLeadIdsWithSale },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              revenue: { $sum: "$salesAmount" },
+              n: { $sum: 1 },
+            },
+          },
+        ])
+        .exec();
+      totalRevenue += (leadOnlyRow?.revenue as number) ?? 0;
+      totalSales += (leadOnlyRow?.n as number) ?? 0;
+    }
+
     const gstCustomers = sales.filter((s) => isGstCustomer(s)).length;
     const gstCustomersPercentage =
-      totalSales > 0 ? (gstCustomers / totalSales) * 100 : 0;
+      sales.length > 0 ? (gstCustomers / sales.length) * 100 : 0;
+    const { dateStart, dateEnd } = calendarMonthBoundsLocal();
+    const thisMonthRevenue = await this.sumRevenueByConversionWindow(
+      dateStart,
+      dateEnd,
+      execOid,
+    );
 
-    // Current month sales
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthSales = sales.filter(
-      (s) => s.saleDate >= currentMonthStart,
-    );
-    const currentMonthRevenue = currentMonthSales.reduce(
-      (sum, sale) => sum + sale.saleAmount,
-      0,
-    );
+    const convWindow = { $gte: dateStart, $lte: dateEnd };
+    const currentMonthSalesAgg = await this.saleModel
+      .aggregate([
+        { $match: { salesExecutiveId: execOid } },
+        {
+          $lookup: {
+            from: this.leadModel.collection.name,
+            localField: "leadId",
+            foreignField: "_id",
+            as: "lead",
+          },
+        },
+        { $unwind: "$lead" },
+        { $match: { "lead.conversionDate": convWindow } },
+        { $count: "n" },
+      ])
+      .exec();
+    const allSaleLeadIds = (
+      (await this.saleModel.distinct("leadId")) as unknown[]
+    ).filter((id) => id != null) as Types.ObjectId[];
+    const leadOnlyConversions = await this.leadModel
+      .countDocuments({
+        converted: true,
+        salesAmount: { $gt: 0 },
+        createdBy: execOid,
+        conversionDate: convWindow,
+        _id: { $nin: allSaleLeadIds },
+      })
+      .exec();
+    const currentMonthSales =
+      ((currentMonthSalesAgg[0]?.n as number) ?? 0) + leadOnlyConversions;
+
+    const conversionMatch: any = {
+      converted: true,
+      createdBy: new Types.ObjectId(salesExecutiveId),
+    };
+    if (startDate || endDate) {
+      conversionMatch.conversionDate = {};
+      if (startDate) conversionMatch.conversionDate.$gte = startDate;
+      if (endDate) conversionMatch.conversionDate.$lte = endDate;
+    }
+    const conversionsInPeriod =
+      await this.leadModel.countDocuments(conversionMatch);
 
     return {
       totalLeads,
@@ -550,8 +713,10 @@ export class DashboardService {
       totalSales,
       totalRevenue,
       gstCustomersPercentage: parseFloat(gstCustomersPercentage.toFixed(2)),
-      currentMonthSales: currentMonthSales.length,
-      currentMonthRevenue,
+      currentMonthSales,
+      currentMonthRevenue: parseFloat(thisMonthRevenue.toFixed(2)),
+      thisMonthRevenue: parseFloat(thisMonthRevenue.toFixed(2)),
+      conversionsInPeriod,
     };
   }
 }

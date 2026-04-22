@@ -95,10 +95,12 @@ export class SalesService {
     });
 
     // Keep Lead document in sync: mark as converted and set sales amount
+    const conversionAt = new Date(convertLeadDto.saleDate);
     await this.leadsService.updateConversion(
       convertLeadDto.leadId,
       true,
       convertLeadDto.saleAmount,
+      conversionAt,
     );
 
     return sale;

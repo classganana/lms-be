@@ -28,6 +28,20 @@ export class AdminSummaryResponseDto {
       "Percentage of sales with GST (gstStatus YES/APPLIED or legacy gstCustomer)",
   })
   gstCustomersPercentage: number;
+
+  @ApiProperty({
+    example: 18,
+    description:
+      "Leads converted in the selected period (by conversionDate, not createdAt)",
+  })
+  conversionsInPeriod: number;
+
+  @ApiProperty({
+    example: 42000,
+    description:
+      "Revenue from conversions in the current calendar month (by lead conversionDate; excludes deleted leads; uses current Sale/Lead amounts)",
+  })
+  thisMonthRevenue: number;
 }
 
 export class SalesExecutivePerformanceDto {
@@ -247,6 +261,24 @@ export class SalesSummaryResponseDto {
   @ApiProperty({ example: 3, description: "Current month sales count" })
   currentMonthSales: number;
 
-  @ApiProperty({ example: 15000, description: "Current month revenue" })
+  @ApiProperty({
+    example: 15000,
+    description:
+      "Revenue from conversions in the current calendar month (by lead conversionDate; same as thisMonthRevenue)",
+  })
   currentMonthRevenue: number;
+
+  @ApiProperty({
+    example: 15000,
+    description:
+      "Revenue from conversions in the current calendar month (by lead conversionDate)",
+  })
+  thisMonthRevenue: number;
+
+  @ApiProperty({
+    example: 4,
+    description:
+      "Leads created by this executive and converted in the selected period (by conversionDate)",
+  })
+  conversionsInPeriod: number;
 }

@@ -72,6 +72,13 @@ export class LeadResponseDto {
   converted?: boolean;
 
   @ApiPropertyOptional({
+    example: "2026-03-15T10:00:00.000Z",
+    description:
+      "When the lead was first converted; used for reporting (set once, not shifted by later edits)",
+  })
+  conversionDate?: Date;
+
+  @ApiPropertyOptional({
     example: "NO",
     enum: ["YES", "NO", "APPLIED", "APPLIED_THROUGH_US"],
     description: "GST status",
@@ -83,6 +90,12 @@ export class LeadResponseDto {
     description: "Sales amount (null if not converted)",
   })
   salesAmount?: number | null;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: "Whether payment information has been shared with the lead",
+  })
+  paymentInfoShared?: boolean;
 
   @ApiProperty({
     example: "2026-01-22T16:07:52.623Z",

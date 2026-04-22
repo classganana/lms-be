@@ -6,6 +6,7 @@ import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { Types } from "mongoose";
 import { buildFilter } from "../common/utils/build-filter";
+import { Sale, SaleDocument } from "../sales/schemas/sale.schema";
 
 /** Normalize mobile to last 10 digits for duplicate check (handles +91, 91, 0 prefix etc) */
 function normalizeMobile(mobile: string): string {
@@ -30,13 +31,17 @@ export const LEAD_FILTER_ALLOWLIST: Record<
   callStatus: "stringExact",
   converted: "boolean",
   gstStatus: "stringExact",
+  paymentInfoShared: "boolean",
   rating: "number",
   createdBy: "objectId",
 };
 
 @Injectable()
 export class LeadsService {
-  constructor(@InjectModel(Lead.name) private leadModel: Model<LeadDocument>) {}
+  constructor(
+    @InjectModel(Lead.name) private leadModel: Model<LeadDocument>,
+    @InjectModel(Sale.name) private saleModel: Model<SaleDocument>,
+  ) {}
 
   async createOrFind(
     createLeadDto: CreateLeadDto,
@@ -95,12 +100,15 @@ export class LeadsService {
     if (createLeadDto.influencerId) {
       payload.influencerId = new Types.ObjectId(createLeadDto.influencerId);
     }
-    ["name", "state", "city", "address", "pincode", "email", "sourceCode", "callStatus", "rating", "notes", "followUpDate", "converted", "gstStatus", "salesAmount"].forEach(
+    ["name", "state", "city", "address", "pincode", "email", "sourceCode", "callStatus", "rating", "notes", "followUpDate", "converted", "gstStatus", "salesAmount", "paymentInfoShared"].forEach(
       (key) => {
         const v = (createLeadDto as any)[key];
         if (v !== undefined && v !== null) payload[key] = v;
       },
     );
+    if ((createLeadDto as any).converted === true) {
+      payload.conversionDate = new Date();
+    }
     return this.leadModel.create(payload);
   }
 
@@ -108,6 +116,9 @@ export class LeadsService {
     id: string,
     updateLeadDto: UpdateLeadDto,
   ): Promise<LeadDocument | null> {
+    const existing = await this.leadModel.findById(id).exec();
+    if (!existing) return null;
+
     const update: Record<string, unknown> = {};
     const {
       influencerId,
@@ -126,6 +137,7 @@ export class LeadsService {
       gstStatus,
       salesAmount,
       mobile,
+      paymentInfoShared,
     } = updateLeadDto;
 
     if (mobile !== undefined) update.mobile = mobile;
@@ -142,20 +154,77 @@ export class LeadsService {
     if (notes !== undefined) update.notes = notes;
     if (followUpDate !== undefined)
       update.followUpDate = followUpDate ? new Date(followUpDate) : null;
-    if (converted !== undefined) update.converted = converted;
+    if (converted !== undefined) {
+      update.converted = converted;
+      if (converted === true && !existing.conversionDate) {
+        update.conversionDate = new Date();
+      }
+    }
     if (gstStatus !== undefined) update.gstStatus = gstStatus;
     if (salesAmount !== undefined) update.salesAmount = salesAmount;
+    if (paymentInfoShared !== undefined) update.paymentInfoShared = paymentInfoShared;
 
-    if (!Object.keys(update).length) {
-      return this.leadModel.findById(id).exec();
+    const mongoUpdate: Record<string, unknown> = {};
+    if (Object.keys(update).length) mongoUpdate.$set = update;
+    if (converted === false) mongoUpdate.$unset = { conversionDate: 1 };
+
+    if (!Object.keys(mongoUpdate).length) {
+      return existing;
     }
 
-    return this.leadModel
-      .findByIdAndUpdate(id, { $set: update }, { new: true })
+    const updated = await this.leadModel
+      .findByIdAndUpdate(id, mongoUpdate, { new: true })
       .exec();
+
+    if (updated) {
+      await this.syncLinkedSaleAfterLeadUpdate(id, updateLeadDto);
+    }
+    return updated;
+  }
+
+  /**
+   * Keeps the Sale collection aligned with Lead when amount/GST/conversion/influencer fields change.
+   * Dashboard revenue and GST metrics aggregate Sale documents.
+   */
+  private async syncLinkedSaleAfterLeadUpdate(
+    leadId: string,
+    dto: UpdateLeadDto,
+  ): Promise<void> {
+    const oid = new Types.ObjectId(leadId);
+
+    if (dto.converted === false) {
+      await this.saleModel.deleteMany({ leadId: oid }).exec();
+      return;
+    }
+
+    const sale = await this.saleModel.findOne({ leadId: oid }).exec();
+    if (!sale) return;
+
+    const saleUpdate: Record<string, unknown> = {};
+    if (dto.salesAmount !== undefined) {
+      saleUpdate.saleAmount =
+        dto.salesAmount == null ? 0 : Number(dto.salesAmount);
+    }
+    if (dto.gstStatus !== undefined) {
+      saleUpdate.gstStatus = dto.gstStatus;
+    }
+    if (dto.influencerId) {
+      saleUpdate.influencerId = new Types.ObjectId(dto.influencerId);
+    }
+    if (dto.sourceCode !== undefined) {
+      saleUpdate.sourceCode = dto.sourceCode;
+    }
+
+    if (Object.keys(saleUpdate).length) {
+      await this.saleModel
+        .updateOne({ _id: sale._id }, { $set: saleUpdate })
+        .exec();
+    }
   }
 
   async remove(id: string): Promise<LeadDocument | null> {
+    const oid = new Types.ObjectId(id);
+    await this.saleModel.deleteMany({ leadId: oid }).exec();
     return this.leadModel.findByIdAndDelete(id).exec();
   }
 
@@ -210,9 +279,12 @@ export class LeadsService {
       notes?: string;
       followUpDate?: Date | null;
       converted?: boolean;
+      /** When converted becomes true, stamps conversionDate if not already set */
+      conversionAt?: Date;
       gstStatus?: "APPLIED" | "APPLIED_THROUGH_US" | "YES" | "NO";
     },
   ): Promise<LeadDocument | null> {
+    const existing = await this.leadModel.findById(leadId).exec();
     const toSet: Record<string, unknown> = {};
     if (snapshot.callStatus !== undefined)
       toSet.callStatus = snapshot.callStatus;
@@ -222,8 +294,16 @@ export class LeadsService {
       toSet.followUpDate = snapshot.followUpDate;
     if (snapshot.converted !== undefined) toSet.converted = snapshot.converted;
     if (snapshot.gstStatus !== undefined) toSet.gstStatus = snapshot.gstStatus;
+    if (
+      snapshot.converted === true &&
+      existing &&
+      !existing.conversionDate
+    ) {
+      toSet.conversionDate = snapshot.conversionAt ?? new Date();
+    }
+    const mongoUpdate: Record<string, unknown> = { $set: toSet };
     return this.leadModel
-      .findByIdAndUpdate(leadId, { $set: toSet }, { new: true })
+      .findByIdAndUpdate(leadId, mongoUpdate, { new: true })
       .exec();
   }
 
@@ -234,13 +314,70 @@ export class LeadsService {
     leadId: string,
     converted: boolean,
     salesAmount: number | null,
+    conversionAt?: Date,
   ): Promise<LeadDocument | null> {
+    const existing = await this.leadModel.findById(leadId).exec();
+    const at = conversionAt ?? new Date();
+    const set: Record<string, unknown> = { converted, salesAmount };
+    if (converted === true && !existing?.conversionDate) {
+      set.conversionDate = at;
+    }
+    if (!converted) {
+      return this.leadModel
+        .findByIdAndUpdate(
+          leadId,
+          { $set: { converted, salesAmount }, $unset: { conversionDate: 1 } },
+          { new: true },
+        )
+        .exec();
+    }
     return this.leadModel
-      .findByIdAndUpdate(
-        leadId,
-        { $set: { converted, salesAmount } },
-        { new: true },
+      .findByIdAndUpdate(leadId, { $set: set }, { new: true })
+      .exec();
+  }
+
+  /**
+   * Backfill conversionDate for legacy documents so reporting does not depend on updatedAt.
+   */
+  async backfillMissingConversionDates(): Promise<{
+    fromSales: number;
+    fromUpdatedAt: number;
+  }> {
+    let fromSales = 0;
+    const saleRows = await this.saleModel
+      .find()
+      .select({ leadId: 1, saleDate: 1 })
+      .lean()
+      .exec();
+    for (const s of saleRows) {
+      if (!s.leadId) continue;
+      const res = await this.leadModel
+        .updateOne(
+          {
+            _id: s.leadId,
+            converted: true,
+            $or: [
+              { conversionDate: { $exists: false } },
+              { conversionDate: null },
+            ],
+          },
+          { $set: { conversionDate: s.saleDate } },
+        )
+        .exec();
+      fromSales += res.modifiedCount ?? 0;
+    }
+    const res2 = await this.leadModel
+      .updateMany(
+        {
+          converted: true,
+          $or: [
+            { conversionDate: { $exists: false } },
+            { conversionDate: null },
+          ],
+        },
+        [{ $set: { conversionDate: "$updatedAt" } }],
       )
       .exec();
+    return { fromSales, fromUpdatedAt: res2.modifiedCount ?? 0 };
   }
 }
