@@ -28,6 +28,10 @@ import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { ParseMongoIdPipe } from "../common/pipes/parse-mongo-id.pipe";
 import { getFilterQuery } from "../common/utils/build-filter";
+import {
+  serializeLeadForClient,
+  serializeLeadsForClient,
+} from "./serialize-lead.util";
 
 /** Last 10 digits for comparing mobile across formatting differences */
 function mobileKey(mobile: string | undefined): string {
@@ -224,7 +228,8 @@ export class LeadsController {
         : {}),
       ...(Object.keys(filter).length ? { filter } : {}),
     };
-    return this.leadsService.findAll(opts);
+    const rows = await this.leadsService.findAll(opts);
+    return serializeLeadsForClient(rows);
   }
 
   @Get("by-mobile")
@@ -259,7 +264,7 @@ export class LeadsController {
         throw new NotFoundException("Lead not found");
       }
     }
-    return lead;
+    return serializeLeadForClient(lead) as Record<string, unknown>;
   }
 
   @Get(":id")
@@ -293,7 +298,7 @@ export class LeadsController {
         throw new ForbiddenException("You do not have access to this lead");
       }
     }
-    return lead;
+    return serializeLeadForClient(lead) as Record<string, unknown>;
   }
 
   @Post()
@@ -315,7 +320,8 @@ export class LeadsController {
     description: "Unauthorized - Invalid or missing JWT token",
   })
   async create(@Body() createLeadDto: CreateLeadDto, @CurrentUser() user: any) {
-    return this.leadsService.createOrFind(createLeadDto, user.id);
+    const doc = await this.leadsService.createOrFind(createLeadDto, user.id);
+    return serializeLeadForClient(doc) as Record<string, unknown>;
   }
 
   @Patch(":id")
@@ -368,7 +374,9 @@ export class LeadsController {
       }
     }
     const lead = await this.leadsService.update(id, updateLeadDto);
-    return lead;
+    return lead
+      ? (serializeLeadForClient(lead) as Record<string, unknown>)
+      : null;
   }
 
   @Delete(":id")
