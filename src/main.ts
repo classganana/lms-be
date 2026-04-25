@@ -6,10 +6,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // CORS: optional comma‑separated *exact* browser origins (scheme+host+port). E.g. both
+  // CORS: optional comma-separated *exact* browser origins (scheme+host+port). E.g. both
   // `https://lms.ziloty.in` and `http://18.60.216.135:3001` if you use more than one URL.
   // If **unset/empty**: allow any origin. If set: request Origin must be in the list.
-  // JWT uses `Authorization` on requests — explicit headers/methods help preflight succeed.
+  // JWT uses `Authorization` on requests - explicit headers/methods help preflight succeed.
   const corsOriginsRaw = configService.get<string>("CORS_ORIGINS");
   const allowList = corsOriginsRaw
     ?.split(",")
@@ -39,7 +39,11 @@ async function bootstrap() {
   // Note: ValidationPipe is configured in app.module.ts as APP_PIPE
   // No need to configure it here to avoid conflicts
 
-  // Setup Swagger using @nestjs/swagger
+  // All HTTP routes under /api/* so nginx can proxy https://lms.ziloty.in/api/ -> this app
+  // (avoids mixed-content: HTTPS page -> HTTP API). See lms-fe .env.example for nginx snippet.
+  app.setGlobalPrefix("api");
+
+  // Setup Swagger using @nestjs/swagger (served at /api/docs)
   const config = new DocumentBuilder()
     .setTitle("Lead Management API")
     .setDescription("API documentation")
