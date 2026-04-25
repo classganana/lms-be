@@ -2,13 +2,39 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ConfigService } from "@nestjs/config";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { ValidationPipe } from "@nestjs/common";
-
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
-  // Enable CORS
-  app.enableCors();
+  // CORS: optional comma‑separated *exact* browser origins (scheme+host+port). E.g. both
+  // `https://lms.ziloty.in` and `http://18.60.216.135:3001` if you use more than one URL.
+  // If **unset/empty**: allow any origin. If set: request Origin must be in the list.
+  // JWT uses `Authorization` on requests — explicit headers/methods help preflight succeed.
+  const corsOriginsRaw = configService.get<string>("CORS_ORIGINS");
+  const allowList = corsOriginsRaw
+    ?.split(",")
+    .map((o) => o.trim())
+    .filter(Boolean) ?? [];
+  const allowAnyOrigin = allowList.length === 0;
+  app.enableCors({
+    origin: (reqOrigin, cb) => {
+      if (allowAnyOrigin) {
+        return cb(null, true);
+      }
+      if (reqOrigin && allowList.includes(reqOrigin)) {
+        return cb(null, true);
+      }
+      return cb(null, false);
+    },
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Accept",
+      "Authorization",
+      "X-Requested-With",
+    ],
+    maxAge: 86400,
+  });
 
   // Note: ValidationPipe is configured in app.module.ts as APP_PIPE
   // No need to configure it here to avoid conflicts
@@ -27,7 +53,6 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
 
-  const configService = app.get(ConfigService);
   const port = configService.get<number>("app.port") || 3000;
 
   await app.listen(port);
