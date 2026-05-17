@@ -103,6 +103,66 @@ export class DashboardService {
     return fromSales + fromLeads;
   }
 
+  /**
+   * Sale rows only if the lead still exists. Drops orphan Sale documents (e.g. legacy
+   * data) so totals match reality after lead deletion.
+   */
+  private async aggregateSaleKpisWithExistingLeads(
+    saleMatch: Record<string, unknown>,
+  ): Promise<{
+    totalSales: number;
+    totalRevenue: number;
+    gstCustomers: number;
+  }> {
+    const agg = await this.saleModel
+      .aggregate([
+        { $match: saleMatch },
+        {
+          $lookup: {
+            from: this.leadModel.collection.name,
+            localField: "leadId",
+            foreignField: "_id",
+            as: "lead",
+          },
+        },
+        { $unwind: "$lead" },
+        {
+          $group: {
+            _id: null,
+            totalSales: { $sum: 1 },
+            totalRevenue: { $sum: "$saleAmount" },
+            gstCustomers: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      {
+                        $in: [
+                          "$gstStatus",
+                          ["YES", "APPLIED", "APPLIED_THROUGH_US"],
+                        ],
+                      },
+                      { $eq: ["$gstCustomer", true] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ])
+      .exec();
+
+    const row = agg[0];
+    return {
+      totalSales: (row?.totalSales as number) ?? 0,
+      totalRevenue: (row?.totalRevenue as number) ?? 0,
+      gstCustomers: (row?.gstCustomers as number) ?? 0,
+    };
+  }
+
   async getAdminSummary(startDate?: Date, endDate?: Date) {
     const dateMatch: any = {};
     if (startDate || endDate) {
@@ -170,10 +230,8 @@ export class DashboardService {
       if (endDate) saleMatch.saleDate.$lte = endDate;
     }
 
-    const sales = await this.saleModel.find(saleMatch).exec();
-    const totalSales = sales.length;
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.saleAmount, 0);
-    const gstCustomers = sales.filter((s) => isGstCustomer(s)).length;
+    const { totalSales, totalRevenue, gstCustomers } =
+      await this.aggregateSaleKpisWithExistingLeads(saleMatch);
     const gstCustomersPercentage =
       totalSales > 0 ? (gstCustomers / totalSales) * 100 : 0;
 
